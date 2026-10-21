@@ -138,6 +138,8 @@ struct ScreenRootView: View {
                 scroll(plan, look: look, inner: inner, minBlock: nil)
             }
         }
+        // The body is cut at the edge of its area (the bottom edge of the inset or of the app bar), not at the edge of the screen.
+        .clipped()
         .layoutValue(key: ScreenZoneKey.self, value: .body)
     }
 
@@ -168,6 +170,10 @@ struct ScreenRootView: View {
                 GeometryReader { proxy in
                     Color.clear.preference(key: ScrollTopKey.self, value: -Double(proxy.frame(in: .named(Self.scrollSpace)).minY))
                 })
+            .reportsScrollTop { top in
+                memory.top = top
+                refreshScrolled(plan)
+            }
         }
         .coordinateSpace(name: Self.scrollSpace)
         .modalBodyScrollSpace()
