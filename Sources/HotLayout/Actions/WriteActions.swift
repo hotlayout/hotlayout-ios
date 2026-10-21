@@ -9,8 +9,6 @@ import Foundation
 /// the lookup of the node's data scope). The path and the value are literals of the document:
 /// `paramBindings` and `carryRecord` are not read.
 enum WriteActions {
-    static let setValue = "setValue"
-    static let toggleValue = "toggleValue"
     static let pathParam = "path"
     static let valueParam = "value"
     static let valueTypeParam = "valueType"
@@ -38,7 +36,7 @@ enum WriteActions {
     }
 
     static func isWriteType(_ type: String?) -> Bool {
-        type == setValue || type == toggleValue
+        ActionType(type) == .setValue || ActionType(type) == .toggleValue
     }
 
     private static func param(_ action: JSONObject, _ name: String) -> String? {
@@ -92,7 +90,7 @@ enum WriteActions {
         guard let path = target.path else { return .invalid(target.problem ?? .missingPath) }
         // A toggle writes the negation of what is SHOWN: on only for the flag `true`. It always
         // writes, and it does not read `value` or `valueType`.
-        if action["type"]?.stringValue == toggleValue { return .write(path: path, value: .bool(!InputRules.flag(of: read(path)))) }
+        if ActionType(action["type"]?.stringValue) == .toggleValue { return .write(path: path, value: .bool(!InputRules.flag(of: read(path)))) }
         let typed = literal(of: action)
         guard let value = typed.value else { return .invalid(typed.problem ?? .notAFlag) }
         return holdsWritten(read(path), value) ? .same(path: path, value: value) : .write(path: path, value: value)
@@ -120,25 +118,25 @@ enum WriteActions {
     /// option).
     static func control(of action: JSONObject, read: (String) -> JSONValue?) -> Control? {
         guard isWriteType(action["type"]?.stringValue), let path = path(of: action).path else { return nil }
-        if action["type"]?.stringValue == toggleValue { return Control(role: .toggle, path: path, on: InputRules.flag(of: read(path))) }
+        if ActionType(action["type"]?.stringValue) == .toggleValue { return Control(role: .toggle, path: path, on: InputRules.flag(of: read(path))) }
         guard let value = literal(of: action).value, value != .string("") else { return nil }
         return Control(role: .option, path: path, on: holdsWritten(read(path), value))
     }
 
     /// The path an option writes: a valid `setValue` with a non-empty value.
     static func optionPath(of action: JSONObject) -> String? {
-        guard action["type"]?.stringValue == setValue, let path = path(of: action).path,
+        guard ActionType(action["type"]?.stringValue) == .setValue, let path = path(of: action).path,
             let value = literal(of: action).value, value != .string("")
         else { return nil }
         return path
     }
 
     /// The types whose `action` is a press (a button, an icon button, a row, a pressable container).
-    static let pressTypes: Set<String> = ["Button", "IconButton", "ListTile", "Column", "Row", "Container", "Stack"]
+    static let pressTypes: Set<WidgetType> = [.button, .iconButton, .listTile, .column, .row, .container, .stack]
 
     /// The action a node performs on a press; `nil` for the rest.
     static func pressAction(of node: DocumentNode) -> JSONObject? {
-        guard pressTypes.contains(node.type) else { return nil }
+        guard pressTypes.contains(node.widget) else { return nil }
         return node.props["action"]?.objectValue
     }
 

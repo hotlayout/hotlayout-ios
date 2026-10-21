@@ -156,7 +156,7 @@ struct ButtonWidget: View {
         let shape = LogicalCornersShape(corners: corners, rightToLeft: context.rightToLeft)
         let label = context.text(node, field: "label")
         let fullWidth = node.props["fullWidth"]?.boolValue ?? true
-        let action = node.props["action"]?.objectValue ?? ["type": "none"]
+        let action = node.props["action"]?.objectValue ?? ["type": .string(ActionType.none.rawValue)]
         let icon = IconBesideTextRules.resolve(props: node.props, field: "icon", scope: context.scope)
         let gap = theme.coreSpacing(IconBesideTextRules.gapToken)
         let disabled = WritePress.isDisabled(

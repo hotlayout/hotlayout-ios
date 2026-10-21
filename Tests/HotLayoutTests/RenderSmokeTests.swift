@@ -13,11 +13,11 @@ final class RenderSmokeTests: XCTestCase {
         var drawn = 0
         for file in files {
             let json = try JSONValue.parse(Data(contentsOf: file))
-            let document = try loadDocument(json)
+            let document = try HotlayoutDocument.load(json)
             for screen in document.screens {
                 guard case .object(var object) = json else { continue }
                 object["initialScreenId"] = .string(screen.screenId)
-                let single = try loadDocument(.object(object))
+                let single = try HotlayoutDocument.load(.object(object))
                 let view = HotlayoutScreen(document: single, locale: "en", now: Date(timeIntervalSince1970: 1_791_000_000))
                     .frame(width: 393, height: 852)
                 let renderer = ImageRenderer(content: view)

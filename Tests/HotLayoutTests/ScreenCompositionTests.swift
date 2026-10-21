@@ -17,7 +17,7 @@ final class ScreenCompositionTests: XCTestCase {
     func document(props: JSONValue = [:]) throws -> HotlayoutDocument {
         var field: JSONObject = ["label": ["kind": "literal", "value": "Name"], "value": ["kind": "binding", "path": "form.name"]]
         for (key, value) in props.objectValue ?? JSONObject() { field[key] = value }
-        return try loadDocument([
+        return try HotlayoutDocument.load([
             "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a",
             "screens": [["screenId": "a", "name": "A", "root": ["id": "r", "type": "Screen", "props": [:], "children": [["id": "f", "type": "TextField", "props": .object(field)]]]]],
         ])

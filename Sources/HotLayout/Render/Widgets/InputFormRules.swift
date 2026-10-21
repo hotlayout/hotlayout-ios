@@ -45,26 +45,26 @@ enum FormRules {
             let hidden = hidden || !WidthRules.showsOn(node, widthClass)
             var own = inherited
             if let condition = node.visibleIf, !condition.isNull { own.append(condition) }
-            switch node.type {
-            case "TextField" where InputRules.isLiteralTrue(node.props["required"]):
+            switch node.widget {
+            case .textField where InputRules.isLiteralTrue(node.props["required"]):
                 let numeric = InputRules.isNumber(valueType: node.props["valueType"])
                 found.append(
                     Field(
                         nodeId: node.id, kind: numeric ? .number : .text, path: InputRules.path(of: node.props["value"]), visibleIf: own,
                         disabledIf: node.props["disabledIf"], hiddenByClass: hidden))
-            case "Checkbox" where InputRules.isLiteralTrue(node.props["required"]):
+            case .checkbox where InputRules.isLiteralTrue(node.props["required"]):
                 found.append(
                     Field(
                         nodeId: node.id, kind: .flag, path: InputRules.path(of: node.props["value"]), visibleIf: own, disabledIf: node.props["disabledIf"],
                         hiddenByClass: hidden))
-            case "ChoiceGroup" where InputRules.isLiteralTrue(node.props["required"]):
+            case .choiceGroup where InputRules.isLiteralTrue(node.props["required"]):
                 found.append(
                     Field(
                         nodeId: node.id, kind: .choice, path: InputRules.path(of: node.props["value"]), visibleIf: own, disabledIf: nil, hiddenByClass: hidden,
                         fallback: InputRules.fallback(of: node.props["value"])))
             default: break
             }
-            if node.type == "Repeater" { return }
+            if node.widget == .repeater { return }
             for child in node.children { walk(child, inherited: own, hidden: hidden) }
         }
         walk(root, inherited: [], hidden: false)
@@ -119,7 +119,7 @@ enum InputOrder {
         var found: [Entry] = []
         func walk(_ node: DocumentNode, visible: Bool) {
             let shown = visible && WidthRules.isShown(node, widthClass, scope: scope)
-            if node.type == "TextField" {
+            if node.widget == .textField {
                 let numeric = InputRules.isNumber(valueType: node.props["valueType"])
                 let multiline = InputRules.effectiveLines(node.props["lines"], numeric: numeric) > 1
                 found.append(
@@ -127,7 +127,7 @@ enum InputOrder {
                         nodeId: node.id,
                         focusable: .init(multiline: multiline, reachable: shown && !InputRules.isDisabled(node.props["disabledIf"], scope: scope))))
             }
-            if node.type == "Repeater" { return }
+            if node.widget == .repeater { return }
             for child in node.children { walk(child, visible: shown) }
         }
         walk(root, visible: true)

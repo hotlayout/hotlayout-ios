@@ -23,7 +23,7 @@ enum LayerRules {
     /// stretched nor an overlay — otherwise there is no box to stand against, and the field is
     /// read on none of them (`noSizingLayer: 'ignore-layer'`).
     static func kinds(parentType: String, children: [JSONObject]) -> [LayerKind] {
-        guard parentType == "Stack" else { return children.map { _ in .sizing } }
+        guard WidgetType(parentType) == .stack else { return children.map { _ in .sizing } }
         let fills = children.map { $0["fill"]?.boolValue == true }
         let reads: [LayerRead?] = zip(children, fills).map { fields, fill in fill ? nil : LayerRead.read(fields["layer"]) }
         let sized = zip(fills, reads).contains { !$0 && $1 == nil }

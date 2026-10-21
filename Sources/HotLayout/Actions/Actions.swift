@@ -70,30 +70,30 @@ public enum ActionCatalog {
     }
 
     struct Entry {
-        let type: String
+        let type: ActionType
         let hostExecutes: Bool
         let params: [Param]
     }
 
     static let entries: [Entry] = [
-        Entry(type: "none", hostExecutes: false, params: []),
-        Entry(type: "navigate", hostExecutes: false, params: [Param(name: "screenId", required: true, form: "screenId", bindable: false)]),
-        Entry(type: "navigate.back", hostExecutes: false, params: []),
-        Entry(type: "navigate.section", hostExecutes: false, params: [Param(name: "screenId", required: true, form: "screenId", bindable: false)]),
-        Entry(type: "openUrl", hostExecutes: true, params: [Param(name: "url", required: true, form: "httpsUrl", bindable: true)]),
-        Entry(type: "deeplink", hostExecutes: true, params: [Param(name: "url", required: true, form: "appLink", bindable: true)]),
-        Entry(type: "close", hostExecutes: true, params: []),
+        Entry(type: .none, hostExecutes: false, params: []),
+        Entry(type: .navigate, hostExecutes: false, params: [Param(name: "screenId", required: true, form: "screenId", bindable: false)]),
+        Entry(type: .navigateBack, hostExecutes: false, params: []),
+        Entry(type: .navigateSection, hostExecutes: false, params: [Param(name: "screenId", required: true, form: "screenId", bindable: false)]),
+        Entry(type: .openUrl, hostExecutes: true, params: [Param(name: "url", required: true, form: "httpsUrl", bindable: true)]),
+        Entry(type: .deeplink, hostExecutes: true, params: [Param(name: "url", required: true, form: "appLink", bindable: true)]),
+        Entry(type: .close, hostExecutes: true, params: []),
         Entry(
-            type: "setValue", hostExecutes: false,
+            type: .setValue, hostExecutes: false,
             params: [
                 Param(name: "path", required: true, form: "dataPath", bindable: false),
                 Param(name: "value", required: false, form: "literal", bindable: false),
                 Param(name: "valueType", required: false, form: "valueType", bindable: false),
             ]),
-        Entry(type: "toggleValue", hostExecutes: false, params: [Param(name: "path", required: true, form: "dataPath", bindable: false)]),
+        Entry(type: .toggleValue, hostExecutes: false, params: [Param(name: "path", required: true, form: "dataPath", bindable: false)]),
     ]
 
-    static func entry(_ type: String) -> Entry? { entries.first { $0.type == type } }
+    static func entry(_ type: String) -> Entry? { ActionType(type).flatMap { type in entries.first { $0.type == type } } }
 
     /// `x-actions.forms` — one source with the artifact (compared by a test).
     static let urlMaxLength = 2048
@@ -179,9 +179,9 @@ public enum ActionCatalog {
                 return HotlayoutAction(type: type, params: base, invalid: InvalidActionParam(param: param.name, problem: problem))
             }
         }
-        switch type {
-        case "openUrl": return HotlayoutAction(type: type, params: base, standard: .openURL(url: params["url"] ?? ""))
-        case "deeplink":
+        switch entry.type {
+        case .openUrl: return HotlayoutAction(type: type, params: base, standard: .openURL(url: params["url"] ?? ""))
+        case .deeplink:
             let url = params["url"] ?? ""
             return HotlayoutAction(type: type, params: base, standard: .deeplink(url: url, scheme: appLinkScheme(url) ?? ""))
         default: return HotlayoutAction(type: type, params: base, standard: .close)

@@ -75,7 +75,7 @@ enum LiveRecord {
         var found: EntitySources = [:]
         func walk(_ node: DocumentNode, _ depth: Int) {
             guard depth <= 64 else { return }
-            if node.type == "Repeater", let source = node.props["source"]?.stringValue, !source.isEmpty,
+            if node.widget == .repeater, let source = node.props["source"]?.stringValue, !source.isEmpty,
                 let item = node.props["item"]?.stringValue, !item.isEmpty
             {
                 var list = found[item] ?? []

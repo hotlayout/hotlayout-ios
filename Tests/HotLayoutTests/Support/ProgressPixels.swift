@@ -72,7 +72,7 @@ enum Body {
     static func document(_ children: [[String: Any]]) throws -> DocumentNode {
         let root: [String: Any] = ["id": "root", "type": "Screen", "props": ["gap": "sm"], "children": children]
         let object: [String: Any] = ["schemaVersion": HotlayoutVersions.schema, "documentId": "t", "name": "t", "initialScreenId": "s", "screens": [["screenId": "s", "name": "s", "root": root]]]
-        return try loadDocument(JSONValue.parse(JSONSerialization.data(withJSONObject: object))).screens[0].root
+        return try HotlayoutDocument.load(JSONValue.parse(JSONSerialization.data(withJSONObject: object))).screens[0].root
     }
 
     static func view(_ children: [[String: Any]], context: RenderContext) throws -> some View {

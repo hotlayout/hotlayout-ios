@@ -31,20 +31,20 @@ enum FlowPull {
     /// stack…), on a zone of the screen, beside a weight that acts, or unreadable.
     static func read(node: DocumentNode, parentType: String, parentProps: JSONObject) -> (by: SpacingReference, axis: Axis)? {
         guard let axis = axis(parentType: parentType, parentProps: parentProps) else { return nil }
-        if node.type == "AppBar" || node.type == "NavBar" { return nil }
+        if node.widget == .appBar || node.widget == .navBar { return nil }
         // A node of the top zone is a node of the column of the screen: the first one pulls nothing (the
         // column of the zone ignores it), the others are pulled as in the body.
-        if parentType == "Screen", let pin = node.fields["pin"], pin.stringValue != ScreenAnatomy.topPin { return nil }
+        if WidgetType(parentType) == .screen, let pin = node.fields["pin"], pin.stringValue != ScreenAnatomy.topPin { return nil }
         guard let by = SpacingReference(node.fields["pull"]) else { return nil }
         if axis == .row, let weight = node.fields["weight"]?.numberValue, weight >= 1, weight == weight.rounded() { return nil }
         return (by, axis)
     }
 
     static func axis(parentType: String, parentProps: JSONObject) -> Axis? {
-        switch parentType {
-        case "Screen", "Column": return .column
-        case "Container": return parentProps["direction"]?.stringValue == "row" ? .row : .column
-        case "Row": return parentProps["wrap"]?.boolValue != true && parentProps["scrollable"]?.boolValue != true ? .row : nil
+        switch WidgetType(parentType) {
+        case .screen, .column: return .column
+        case .container: return parentProps["direction"]?.stringValue == "row" ? .row : .column
+        case .row: return parentProps["wrap"]?.boolValue != true && parentProps["scrollable"]?.boolValue != true ? .row : nil
         default: return nil
         }
     }

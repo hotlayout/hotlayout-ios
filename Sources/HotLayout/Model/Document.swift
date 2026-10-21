@@ -135,18 +135,14 @@ public func loadDocument(_ json: JSONValue) throws -> HotlayoutDocument { try Ho
 
 /// The tolerant reader of the document tree.
 enum DocumentReader {
+    /// Widgets of the schema; any other type is an unknown widget.
+    static let knownWidgets = Set(WidgetType.allCases.map(\.rawValue))
+
     /// Levels UNDER a screen root that are drawn. A deeper tree is refused before any
     /// recursion (the legal maximum is far smaller).
     static let maxParseDepth = 32
     /// A key an open map cannot have (`protoKeyWithoutValidation: 'drop-entry'`).
     static let forbiddenKey = "__proto__"
-
-    /// Widgets of the schema (`x-compatibility.widgets`); any other type is an unknown widget.
-    static let knownWidgets: Set<String> = [
-        "Screen", "AppBar", "Column", "Row", "Container", "Grid", "Stack", "Tabs", "Tab", "Accordion",
-        "ChoiceGroup", "Repeater", "Spacer", "Divider", "Text", "Image", "Icon", "Button", "IconButton",
-        "ListTile", "ProgressBar", "CircularProgress", "Badge", "NavBar", "NavItem", "TextField", "Switch", "Checkbox",
-    ]
 
     static func read(_ raw: JSONValue) throws -> HotlayoutDocument {
         let json = withoutForbiddenKeys(raw)
@@ -225,7 +221,7 @@ enum DocumentReader {
         if let value = object["props"] {
             if let own = value.objectValue { props = own } else { sink.add(.ignoredInput, here, "props are not an object; the widget draws with its defaults") }
         }
-        if !knownWidgets.contains(type) {
+        if WidgetType(rawValue: type) == nil {
             sink.add(.unknownWidget, here, "unknown widget “\(type)”; its children are drawn")
         }
         var children: [DocumentNode] = []

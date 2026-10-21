@@ -81,7 +81,7 @@ final class ProgressFixtureTests: XCTestCase {
     func testTheFixtureBodyDrawsWithBothWidgetsDrawn() throws {
         XCTAssertTrue(DocumentReader.knownWidgets.isSuperset(of: ["ProgressBar", "CircularProgress"]))
         let json = try Contract.json("fixtures/progress-screens.json")
-        let document = try loadDocument(json)
+        let document = try HotlayoutDocument.load(json)
         let root = try XCTUnwrap(document.screens.first?.root)
         let theme = HotlayoutThemeSet.builtIn.theme()
         let context = Body.context(theme: theme)

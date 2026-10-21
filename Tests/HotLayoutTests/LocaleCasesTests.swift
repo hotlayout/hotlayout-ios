@@ -10,7 +10,7 @@ final class LocaleCasesTests: XCTestCase {
         XCTAssertEqual(rows.count, 38)
         for row in rows {
             let name = row["name"]?.stringValue ?? "?"
-            let answer = resolveLocale(
+            let answer = LocaleResolution.resolve(
                 row["requested"]?.stringValue,
                 available: (row["available"]?.arrayValue ?? []).compactMap(\.stringValue),
                 source: row["source"]?.stringValue

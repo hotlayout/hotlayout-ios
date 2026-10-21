@@ -263,10 +263,10 @@ struct Flow: Equatable, Sendable {
             outcome.hostRecord = record
         }
 
-        switch type {
-        case "none":
+        switch ActionType(type) {
+        case ActionType.none?:
             return outcome
-        case "navigate":
+        case .navigate:
             guard let target, let screen = document.screen(target) else {
                 toHost()
                 return outcome
@@ -276,7 +276,7 @@ struct Flow: Equatable, Sendable {
                 insideListItem: !instances.isEmpty, presentation: screen.presentation, carryRecord: action["carryRecord"]?.boolValue == true)
             stack.append(FlowFrame(screenId: target, chain: carried ? chain : []))
             outcome.shown = shownEvent(cause: .forward)
-        case "navigate.back":
+        case .navigateBack:
             guard stack.count > 1 else {
                 toHost()
                 return outcome
@@ -284,7 +284,7 @@ struct Flow: Equatable, Sendable {
             guard allowNavigation(.back, stack.last!.screenId, stack[stack.count - 2].screenId, handed) else { return outcome }
             stack.removeLast()
             outcome.shown = shownEvent(cause: .back)
-        case "navigate.section":
+        case .navigateSection:
             guard let target, document.screen(target) != nil else {
                 toHost()
                 return outcome

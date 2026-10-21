@@ -40,9 +40,9 @@ enum AlignRules {
     /// defaults. A container without `direction` is a column.
     static func read(type: String, props: JSONObject) -> AlignmentRead? {
         let axis: MainAxis
-        switch type {
-        case "Screen", "Column": axis = .block
-        case "Container": axis = props["direction"]?.stringValue == "row" ? .inline : .block
+        switch WidgetType(type) {
+        case .screen, .column: axis = .block
+        case .container: axis = props["direction"]?.stringValue == "row" ? .inline : .block
         default: return nil
         }
         // No field or an unknown word acts as without the field: `start` on the main axis, and
@@ -55,7 +55,7 @@ enum AlignRules {
     /// Whether a layer fills the stack it stands in: `fill` is read only as `true` on a direct
     /// child of a `Stack`.
     static func fills(fields: JSONObject, parent: String?) -> Bool {
-        parent == "Stack" && fields["fill"]?.boolValue == true
+        WidgetType(parent) == .stack && fields["fill"]?.boolValue == true
     }
 
     /// What gives a column host a height larger than its content; `nil` — it is as tall as its

@@ -92,7 +92,7 @@ enum SwipeConfirmRules {
     /// (navigation, also when the host cancelled it, and writes).
     static func runner(type: String?, outcome: PressOutcome) -> Runner {
         if let handed = outcome.handed { return handed.invalid != nil ? .invalid : .host }
-        return type == "none" || type == nil ? .none : .reader
+        return ActionType(type) == ActionType.none || type == nil ? .none : .reader
     }
 
     static func afterRelease(_ runner: Runner) -> AfterRelease {

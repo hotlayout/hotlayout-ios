@@ -30,7 +30,7 @@ struct RepeaterWidget: View {
         let header = node.children.count > RecordGroups.headerChild && RepeaterPlan.groupBy(node.props) != nil ? node.children[RecordGroups.headerChild] : nil
         let columns = RepeaterPlan.columns(node.props, overridden: node.columnsFromOverride)
         let gap = context.resolver.spacing(node.props["gap"] ?? "sm") ?? 0
-        let numbered = template.type == "Text" && template.props["marker"]?.stringValue == "number"
+        let numbered = template.widget == .text && template.props["marker"]?.stringValue == "number"
         let item = node.props["item"]?.stringValue ?? ""
         let source = node.props["source"]?.stringValue ?? ""
 

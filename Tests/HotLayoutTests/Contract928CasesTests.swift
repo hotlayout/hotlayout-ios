@@ -194,7 +194,7 @@ final class Contract928CasesTests: XCTestCase {
             given = row["value"] ?? .null
         }
         contract = setting(contract, path, to: given)
-        return (try loadTheme(contract), id)
+        return (try HotlayoutThemeSet.load(contract), id)
     }
 
     private func drawn(_ row: JSONObject, _ read: (set: HotlayoutThemeSet, id: String)) throws -> Double {
@@ -267,7 +267,7 @@ final class Contract928CasesTests: XCTestCase {
     /// A JSON parser reads `1e309` as infinity: the text of a theme with it is replaced, not skipped.
     func testInfinityFromTheTextOfATheme() throws {
         let text = #"{"themeContractVersion":"4.0.1","defaultThemeId":"light","themes":{"light":{"id":"light","brightness":"light","spacing":{"md":1e309,"hero":-1e309}}}}"#
-        let set = try loadTheme(Data(text.utf8))
+        let set = try HotlayoutThemeSet.load(Data(text.utf8))
         XCTAssertEqual(set.theme("light").spacing["md"], 12, "the built-in value of the same token")
         XCTAssertEqual(set.theme("light").spacing["hero"], 0, "the nearest bound")
     }

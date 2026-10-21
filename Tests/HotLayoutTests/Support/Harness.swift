@@ -37,7 +37,7 @@ struct Pixels {
 enum Harness {
     /// A node of a document: `json` is wrapped into a screen and read by the document reader.
     static func node(_ json: JSONValue) throws -> DocumentNode {
-        let document = try loadDocument(.object(JSONObject([
+        let document = try HotlayoutDocument.load(.object(JSONObject([
             ("schemaVersion", "9.27.0"), ("documentId", "d"), ("name", "n"), ("initialScreenId", "a"),
             ("screens", [.object(JSONObject([
                 ("screenId", "a"), ("name", "A"),

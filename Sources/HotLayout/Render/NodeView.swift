@@ -28,7 +28,7 @@ struct NodeView: View {
                 .modifier(NodeBoxModifier(look: shaped.withoutMargin, placement: placementWithMainAxis, context: inner))
             // The press target is the box of the node without its margin; the motion moves that box.
             pressable(box, inner)
-                .nodeMotion(motionOutside || node.type == "Screen" ? nil : NodeMotion.read(node.fields["motion"]), rightToLeft: context.rightToLeft)
+                .nodeMotion(motionOutside || node.widget == .screen ? nil : NodeMotion.read(node.fields["motion"]), rightToLeft: context.rightToLeft)
                 .padding(shaped.margin.edgeInsets)
         }
     }
@@ -37,13 +37,13 @@ struct NodeView: View {
     /// it while the body is scrolled.
     private func effectiveStyle() -> JSONObject {
         let style = NodeStyle.effective(node, scope: context.scope)
-        guard node.type == "AppBar", context.barScrolled else { return style }
+        guard node.widget == .appBar, context.barScrolled else { return style }
         return AppBarRules.withScrolledLayer(style, scrolled: AppBarRules.scrolledStyle(node), resolver: context.resolver)
     }
 
     /// A ring stands in the centre of its box; every other node keeps the placement it was given.
     private var placementWithMainAxis: Placement {
-        guard node.type == "CircularProgress" else { return placement }
+        guard node.widget == .circularProgress else { return placement }
         var centered = placement
         centered.contentAlignment = .center
         return centered
@@ -69,8 +69,8 @@ struct NodeView: View {
         var look = look
         if carousel { look.padding = .zero }
         // The inset of the status bar lies inside the box of the app bar, above its padding.
-        if node.type == "AppBar", context.barInset > 0 { look.padding.top += context.barInset }
-        guard ["Button", "IconButton", "Badge"].contains(node.type) else { return look }
+        if node.widget == .appBar, context.barInset > 0 { look.padding.top += context.barInset }
+        guard let widget = node.widget, [.button, .iconButton, .badge].contains(widget) else { return look }
         var outer = BoxLook()
         outer.surfaceDrawnByWidget = true
         outer.margin = look.margin
@@ -87,7 +87,7 @@ struct NodeView: View {
     /// Containers with an action are pressable as a whole (9.19.0).
     @ViewBuilder
     private func pressable(_ content: some View, _ context: RenderContext) -> some View {
-        if PressTarget.containerTypes.contains(node.type) {
+        if PressTarget.containerTypes.contains(node.widget) {
             PressableCard(node: node, context: context, content: content)
         } else {
             content
@@ -96,14 +96,14 @@ struct NodeView: View {
 
     @ViewBuilder
     private func widget(_ context: RenderContext, style: JSONObject, space: HostSpace, carouselPadding: Sides?) -> some View {
-        switch node.type {
-        case "Screen", "Column":
+        switch node.widget {
+        case .screen, .column:
             ColumnView(
                 children: node.children, gap: context.resolver.spacing(node.props["gap"] ?? "sm") ?? 0, node: node, space: space, context: context, depth: depth
             )
-        case "Row":
+        case .row:
             RowView(node: node, space: space, context: context, depth: depth, carouselPadding: carouselPadding)
-        case "Container":
+        case .container:
             if node.props["direction"]?.stringValue == "row" {
                 RowView(node: node, space: space, context: context, depth: depth)
             } else {
@@ -111,55 +111,55 @@ struct NodeView: View {
                     children: node.children, gap: context.resolver.spacing(node.props["gap"] ?? "none") ?? 0, node: node, space: space, context: context,
                     depth: depth)
             }
-        case "Stack":
+        case .stack:
             StackView(node: node, context: context, depth: depth, stretch: placement.stretchWidth)
-        case "Text":
+        case .text:
             TextRichWidget(node: node, context: context, position: self.context.listPosition)
-        case "Image":
+        case .image:
             ImageWidget(node: node, context: context, look: context.resolver.box(style, scope: self.context.scope))
-        case "Icon":
+        case .icon:
             IconWidget(node: node, context: context, look: self.context.resolver.box(style, scope: self.context.scope))
-        case "Button":
+        case .button:
             ButtonWidget(node: node, style: style, context: context)
-        case "Repeater":
+        case .repeater:
             RepeaterWidget(node: node, context: context, depth: depth, carouselPadding: carouselPadding)
-        case "Grid":
+        case .grid:
             GridWidget(node: node, context: context, depth: depth)
-        case "IconButton":
+        case .iconButton:
             IconButtonWidget(node: node, style: style, context: context)
-        case "Badge":
+        case .badge:
             BadgeWidget(node: node, style: style, context: context)
-        case "ListTile":
+        case .listTile:
             ListTileWidget(node: node, context: context)
-        case "Accordion":
+        case .accordion:
             AccordionWidget(node: node, context: context, depth: depth)
-        case "Tabs":
+        case .tabs:
             TabsWidget(node: node, context: context, depth: depth)
-        case "Tab":
+        case .tab:
             // The panel is the node itself: its children in a column, `md` apart.
             ColumnView(
                 children: node.children, gap: context.resolver.spacing(.string(TabsRules.panelGapToken)) ?? 12, node: nil, context: context, depth: depth)
-        case "AppBar":
+        case .appBar:
             AppBarWidget(node: node, context: context, depth: depth)
-        case "NavBar":
+        case .navBar:
             NavBarWidget(node: node, style: style, context: context, depth: depth)
-        case "NavItem":
+        case .navItem:
             NavItemWidget(node: node, context: context)
-        case "TextField":
+        case .textField:
             InputTextFieldWidget(node: node, context: context)
-        case "Switch":
+        case .switch:
             InputToggleWidget(node: node, context: context, kind: .toggle)
-        case "Checkbox":
+        case .checkbox:
             InputToggleWidget(node: node, context: context, kind: .checkbox)
-        case "ChoiceGroup":
+        case .choiceGroup:
             ChoiceGroupWidget(node: node, context: context, depth: depth)
-        case "Spacer":
+        case .spacer:
             SpacerWidget(node: node, context: context)
-        case "Divider":
+        case .divider:
             DividerWidget(node: node, context: context)
-        case "ProgressBar":
+        case .progressBar:
             ProgressBarWidget(node: node, context: context)
-        case "CircularProgress":
+        case .circularProgress:
             // Under a row weight the width fields of the style do not name the diameter.
             CircularProgressWidget(node: node, context: context, style: style, widthApplies: !placement.stretchWidth)
         default:
@@ -178,10 +178,10 @@ struct NodeView: View {
 /// instead of stretching to the column.
 func takesNaturalWidth(_ node: DocumentNode) -> Bool {
     if node.style?["width"] != nil { return true }
-    switch node.type {
-    case "Button": return node.props["fullWidth"]?.boolValue == false
-    case "IconButton", "Badge", "Icon", "CircularProgress": return true
-    case "Divider", "Spacer": return node.props["orientation"]?.stringValue == "vertical"
+    switch node.widget {
+    case .button: return node.props["fullWidth"]?.boolValue == false
+    case .iconButton, .badge, .icon, .circularProgress: return true
+    case .divider, .spacer: return node.props["orientation"]?.stringValue == "vertical"
     default: return false
     }
 }
@@ -265,7 +265,7 @@ struct RowView: View {
     var carouselPadding: Sides?
 
     var body: some View {
-        let isContainer = node.type == "Container"
+        let isContainer = node.widget == .container
         let gap = context.resolver.spacing(node.props["gap"] ?? (isContainer ? "none" : "sm")) ?? 0
         // An unknown word acts as without the field: `start` on the main axis, `center` across.
         let justify = node.props["justify"]?.stringValue.flatMap(JustifyWord.init(rawValue:)) ?? .start
@@ -317,10 +317,10 @@ struct RowView: View {
     static func weight(of child: DocumentNode) -> Double? {
         if let weight = child.fields["weight"]?.numberValue, weight >= 1, weight == weight.rounded() { return weight }
         if child.style?["width"] != nil { return nil }
-        switch child.type {
-        case "Button" where child.props["fullWidth"]?.boolValue != false: return 1
-        case "Divider", "Spacer": return child.props["orientation"]?.stringValue == "vertical" ? nil : 1
-        case "ProgressBar": return 1
+        switch child.widget {
+        case .button where child.props["fullWidth"]?.boolValue != false: return 1
+        case .divider, .spacer: return child.props["orientation"]?.stringValue == "vertical" ? nil : 1
+        case .progressBar: return 1
         default: return nil
         }
     }

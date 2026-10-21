@@ -12,7 +12,7 @@ struct ListSiblings {
     let visible: [Bool]
 
     init(children: [DocumentNode], scope: DataScope, widthClass: WidthClass = .compact) {
-        markers = children.map { $0.type == "Text" ? ListMarkerRules.drawn($0.props["marker"]) : nil }
+        markers = children.map { $0.widget == .text ? ListMarkerRules.drawn($0.props["marker"]) : nil }
         visible = children.map { WidthRules.isShown($0, widthClass, scope: scope) }
     }
 

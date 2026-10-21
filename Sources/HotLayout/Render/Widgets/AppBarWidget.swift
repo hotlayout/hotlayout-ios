@@ -26,7 +26,7 @@ struct AppBarWidget: View {
         let actionGap = theme.coreSpacing(AppBarRules.actionGapToken)
         let child = childContext()
         let titleHidden = AppBarRules.titleShownOnlyWhenScrolled(node.props) && !context.barScrolled
-        let navItems = (context.barNav?.children ?? []).filter { $0.type == "NavItem" && context.isShown($0) }.prefix(NavBarRules.maxItems)
+        let navItems = (context.barNav?.children ?? []).filter { $0.widget == .navItem && context.isShown($0) }.prefix(NavBarRules.maxItems)
         let navContext = itemsContext()
 
         AppBarRowLayout(
@@ -36,7 +36,7 @@ struct AppBarWidget: View {
             switch shown {
             case .node:
                 if let leadingNode {
-                    NodeView(node: naturalWidth(leadingNode), context: child, placement: .natural, depth: depth + 1, parentType: "AppBar")
+                    NodeView(node: naturalWidth(leadingNode), context: child, placement: .natural, depth: depth + 1, parentType: WidgetType.appBar.rawValue)
                         .layoutValue(key: AppBarPartKey.self, value: .leadingNode)
                 }
             case .back:
@@ -48,11 +48,11 @@ struct AppBarWidget: View {
                 .opacity(titleHidden ? 0 : 1)
                 .layoutValue(key: AppBarPartKey.self, value: .title)
             ForEach(Array(actionNodes.prefix(AppBarRules.maxDrawnActions).enumerated()), id: \.offset) { _, action in
-                NodeView(node: action, context: child, placement: .natural, depth: depth + 1, parentType: "AppBar")
+                NodeView(node: action, context: child, placement: .natural, depth: depth + 1, parentType: WidgetType.appBar.rawValue)
                     .layoutValue(key: AppBarPartKey.self, value: .action)
             }
             ForEach(Array(navItems.enumerated()), id: \.offset) { _, item in
-                NodeView(node: item, context: navContext, placement: .natural, depth: depth + 1, parentType: "NavBar")
+                NodeView(node: item, context: navContext, placement: .natural, depth: depth + 1, parentType: WidgetType.navBar.rawValue)
                     .layoutValue(key: AppBarPartKey.self, value: .navItem)
             }
         }
@@ -88,7 +88,7 @@ struct AppBarWidget: View {
     /// The width of the node of the leading zone is natural, even for a button that would fill:
     /// «full width» has nothing to mean in a zone as wide as the node.
     private func naturalWidth(_ leading: DocumentNode) -> DocumentNode {
-        guard leading.type == "Button", leading.props["fullWidth"]?.boolValue != false else { return leading }
+        guard leading.widget == .button, leading.props["fullWidth"]?.boolValue != false else { return leading }
         var props = leading.props
         props["fullWidth"] = .bool(false)
         return DocumentNode(id: leading.id, type: leading.type, props: props, fields: leading.fields, children: leading.children)
@@ -125,7 +125,7 @@ struct AppBarWidget: View {
     private func backArrow(side: Double) -> some View {
         let box = iconBox(size: "md", glyphSize: nil, theme: theme)
         return Button {
-            context.press(["type": "navigate.back"], node)
+            context.press(["type": .string(ActionType.navigateBack.rawValue)], node)
         } label: {
             IconGlyph(name: "chevron", glyph: box.glyph, box: box.box, color: context.inherited.color.color, rightToLeft: context.rightToLeft)
                 .rotationEffect(.degrees(180))

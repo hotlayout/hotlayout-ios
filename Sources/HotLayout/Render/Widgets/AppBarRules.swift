@@ -22,7 +22,7 @@ enum AppBarRules {
         node.fields["zone"]?.stringValue == "leading" ? "leading" : nil
     }
 
-    static func canStandInLeadingZone(_ type: String) -> Bool { type == "Button" || type == "IconButton" }
+    static func canStandInLeadingZone(_ type: String) -> Bool { [.button, .iconButton].contains(WidgetType(type)) }
 
     /// The index of the node of the leading zone: the first child with the field whose type may
     /// stand there. Visibility is not asked here.
@@ -32,7 +32,7 @@ enum AppBarRules {
 
     /// The indexes of the actions: icon buttons WITHOUT the field, in document order.
     static func actionIndexes(_ children: [DocumentNode]) -> [Int] {
-        children.indices.filter { children[$0].type == "IconButton" && zone(of: children[$0]) == nil }
+        children.indices.filter { children[$0].widget == .iconButton && zone(of: children[$0]) == nil }
     }
 
     /// Which actions are drawn, given which are visible: the first two visible ones.

@@ -37,7 +37,7 @@ final class Contract928ScreenWiringTests: XCTestCase {
 
     /// The pixels of the real screen drawn with the theme; the same document every time.
     private func pixels(_ spacing: [(String, JSONValue)], padding: JSONValue) throws -> Data {
-        let theme = try loadTheme(try themeJSON(spacing: spacing))
+        let theme = try HotlayoutThemeSet.load(try themeJSON(spacing: spacing))
         let document = try screenDocument([("a", [box("card", padding: padding)])])
         let (image, bytes) = try screenPixels(HotlayoutScreen(document: document, theme: theme, locale: "en"))
         // The screen is drawn: the red box is on it (a blank picture would make every comparison pass).
@@ -65,7 +65,7 @@ final class Contract928ScreenWiringTests: XCTestCase {
 
     func testTheReplacementReachesTheHostThroughOnReport() throws {
         let recorder = Recorder()
-        let theme = try loadTheme(try themeJSON(spacing: [("md", 1_000_000_000), ("hero", 500)]))
+        let theme = try HotlayoutThemeSet.load(try themeJSON(spacing: [("md", 1_000_000_000), ("hero", 500)]))
         let document = try screenDocument([("a", [box("card", padding: "md")])])
         let held = showScreen(HotlayoutScreen(document: document, theme: theme, locale: "en", onReport: { recorder.reports += $0 }))
         withExtendedLifetime(held) {}
@@ -94,7 +94,7 @@ final class Contract928ScreenWiringTests: XCTestCase {
                 "id": "open", "type": "Button",
                 "props": ["label": ["kind": "literal", "value": "Open layer"], "variant": "ghost", "fullWidth": false, "action": ["type": "navigate", "params": ["screenId": "layer"]]],
             ]
-            let document = try loadDocument([
+            let document = try HotlayoutDocument.load([
                 "schemaVersion": "9.28.0", "documentId": "d", "name": "n", "initialScreenId": "a",
                 "screens": [
                     ["screenId": "a", "name": "A", "root": ["id": "ra", "type": "Screen", "props": [:], "children": [button, text("under", "Page text")]]],

@@ -23,7 +23,7 @@ enum ShowcaseApp: String, CaseIterable, Identifiable {
             object["initialScreenId"] = .string(screenId)
             root = .object(object)
         }
-        return try loadDocument(root)
+        return try HotlayoutDocument.load(root)
     }
 
     /// The theme names variable fonts by the name of the web's font file («Geist Variable»); the family the
@@ -33,7 +33,7 @@ enum ShowcaseApp: String, CaseIterable, Identifiable {
             var text = try? String(contentsOf: url, encoding: .utf8)
         else { return .builtIn }
         text = text.replacingOccurrences(of: "Geist Variable", with: "Geist")
-        return (try? loadTheme(Data(text.utf8))) ?? .builtIn
+        return (try? HotlayoutThemeSet.load(Data(text.utf8))) ?? .builtIn
     }
 
     /// The moment the sample data was taken and the data of the app in the language of the screen.

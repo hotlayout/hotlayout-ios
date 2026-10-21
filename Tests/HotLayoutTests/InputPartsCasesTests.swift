@@ -94,7 +94,7 @@ final class InputPartsCasesTests: XCTestCase {
                 "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a",
                 "screens": [["screenId": "a", "name": "A", "root": ["id": "r", "type": "Screen", "props": [:], "children": [["id": "f", "type": "TextField", "props": .object(props)]]]]],
             ]
-            guard let document = try? loadDocument(screen) else { XCTFail("not loaded: \(Self.name(row))"); continue }
+            guard let document = try? HotlayoutDocument.load(screen) else { XCTFail("not loaded: \(Self.name(row))"); continue }
             for locale in ["en", "ar"] {
                 let view = HotlayoutScreen(document: document, data: ["form.name": "Alex"], locale: locale).frame(width: 320, height: 480)
                 XCTAssertNotNil(ImageRenderer(content: view).cgImage, "\(Self.name(row)) \(locale)")

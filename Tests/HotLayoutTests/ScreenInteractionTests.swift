@@ -15,7 +15,7 @@ final class ScreenInteractionTests: XCTestCase {
     }
 
     func document(_ children: JSONValue) throws -> HotlayoutDocument {
-        try loadDocument([
+        try HotlayoutDocument.load([
             "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a",
             "screens": [["screenId": "a", "name": "A", "root": ["id": "r", "type": "Screen", "props": [:], "children": children]]],
         ])
