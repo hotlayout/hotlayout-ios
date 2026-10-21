@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Top of the screen.** The body is cut at the edge of its area (the bottom edge of the status-bar
+  inset without an app bar), so a scrolled body no longer shows under the clock. The scrolled look
+  of the app bar (`styleScrolled`, `titleShown: 'scrolled'`) follows the scroll offset of the
+  scroll view itself: the geometry preference it used did not fire while the content was only
+  scrolled, so the look never switched on.
+- **Modal window.** A window is centred in the area between the top inset and the home indicator,
+  as the shared table says. The shadow and the border of the layer's root are drawn.
 - **Loaders as members.** `HotlayoutDocument.load(_:)`, `HotlayoutThemeSet.load(_:)`,
   `HotlayoutVersions.check(_:readerVersion:)`, `HotlayoutVersions.checkDocument(_:)` and
   `LocaleResolution.resolve(_:available:source:)` replace the global functions `loadDocument`,

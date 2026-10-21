@@ -214,6 +214,7 @@ public struct HotlayoutScreen: View {
                     )
                 },
                 margin: StyleResolver(theme: themeSet.theme(themeId)).spacing(.string("xl")) ?? ModalRules.defaultMargin,
+                insets: insets,
                 dismiss: { animated in
                     _ = perform(["type": "navigate.back"], node: DocumentNode(id: "modal-dismiss", type: "Screen"), animated: animated)
                 }

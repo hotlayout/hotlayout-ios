@@ -74,7 +74,16 @@ struct ScreenRootView: View {
                 navZone(plan, inner: inner)
             }
         }
+        .overlay {
+            // The border of the root (a window shows it) lies on the inner edge of its box.
+            if let color = look.borderColor, let width = look.borderWidth, width > 0 {
+                LogicalCornersShape(corners: look.radius ?? Corners(), rightToLeft: context.rightToLeft).inset(by: width / 2).stroke(color.color, lineWidth: width)
+                    .allowsHitTesting(false)
+            }
+        }
         .clipped()
+        // The shadow of the root lies outside its box, so it is drawn behind the clipped screen (a window shows it).
+        .shadowLayers(look.shadow, shape: LogicalCornersShape(corners: look.radius ?? Corners(), rightToLeft: context.rightToLeft))
         .keyboardOverlap($keyboard)
         .onPreferenceChange(ZoneHeightKey.self) { height in if plan.floats, height != floatTail { floatTail = height } }
         .onChange(of: barHeight) { _ in refreshScrolled(plan) }
@@ -138,6 +147,8 @@ struct ScreenRootView: View {
                 scroll(plan, look: look, inner: inner, minBlock: nil)
             }
         }
+        // The body is cut at the edge of its area (the bottom edge of the inset or of the app bar), not at the edge of the screen.
+        .clipped()
         .layoutValue(key: ScreenZoneKey.self, value: .body)
     }
 
@@ -168,6 +179,10 @@ struct ScreenRootView: View {
                 GeometryReader { proxy in
                     Color.clear.preference(key: ScrollTopKey.self, value: -Double(proxy.frame(in: .named(Self.scrollSpace)).minY))
                 })
+            .reportsScrollTop { top in
+                memory.top = top
+                refreshScrolled(plan)
+            }
         }
         .coordinateSpace(name: Self.scrollSpace)
         .modalBodyScrollSpace()

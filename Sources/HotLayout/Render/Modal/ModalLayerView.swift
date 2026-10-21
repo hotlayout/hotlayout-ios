@@ -91,6 +91,8 @@ struct ModalLayerView: View {
     let isTop: Bool
     /// Blur of the layer's own picture: the layers above it blur it.
     let blurredBy: Double
+    /// What the host's window leaves of the area: the layer lies in the area below the top inset, a window also above the bottom one.
+    var insets = ScreenInsets()
     let dismiss: (_ animated: Bool) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -125,6 +127,9 @@ struct ModalLayerView: View {
                             Color.clear.onAppear { sheetHeight = proxy.size.height }.onChange(of: proxy.size.height) { sheetHeight = $0 }
                         })
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, CGFloat(insets.top))
+            .padding(.bottom, window ? CGFloat(insets.bottom) : 0)
             .blur(radius: blurredBy)
             .offset(y: offset)
             .modifier(SheetDrag(enabled: !window && dismissible && isTop && !exiting, gesture: dragGesture))
@@ -216,6 +221,7 @@ struct ModalStack: View {
     let page: AnyView
     let layers: [Layer]
     let margin: Double
+    var insets = ScreenInsets()
     /// `animated` is false after the sheet has already left by a drag.
     let dismiss: (_ animated: Bool) -> Void
 
@@ -238,6 +244,7 @@ struct ModalStack: View {
                     dismissible: layer.dismissible,
                     isTop: index == layers.count - 1,
                     blurredBy: blur(above: index),
+                    insets: insets,
                     dismiss: dismiss
                 )
                 .zIndex(Double(index + 1))
