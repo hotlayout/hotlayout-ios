@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Drawing:
+
 - **Top of the screen.** The body is cut at the edge of its area (the bottom edge of the status-bar
   inset without an app bar), so a scrolled body no longer shows under the clock. The scrolled look
   of the app bar (`styleScrolled`, `titleShown: 'scrolled'`) follows the scroll offset of the
@@ -9,27 +11,6 @@
   scrolled, so the look never switched on.
 - **Modal window.** A window is centred in the area between the top inset and the home indicator,
   as the shared table says. The shadow and the border of the layer's root are drawn.
-- **Loaders as members.** `HotlayoutDocument.load(_:)`, `HotlayoutThemeSet.load(_:)`,
-  `HotlayoutVersions.check(_:readerVersion:)`, `HotlayoutVersions.checkDocument(_:)` and
-  `LocaleResolution.resolve(_:available:source:)` replace the global functions `loadDocument`,
-  `loadTheme`, `checkVersion`, `checkDocumentVersion` and `resolveLocale`, which stay as deprecated
-  forwards.
-- **README.** The example reads the document and the theme once, in `.task`, and shows the load
-  error, instead of parsing on every evaluation of `body`.
-- **Values for words.** `ScreenEntry.placement`, `ScreenEntry.statusBar`,
-  `ScreenShownEvent.placement`, `ScreenShownEvent.statusBar` and `HotlayoutTheme.appearance` give
-  `modalPlacement`, `statusBarIcons` and `brightness` as enums (`ModalPlacement`, `StatusBarIcons`,
-  `ThemeBrightness`). `ScreenShownEvent.modalPlacement` and `.statusBarIcons` are deprecated.
-- **Documentation.** One-line comments on the public declarations of the model, the JSON value and
-  the actions; the reason for the own JSON parser is stated; the module `HotLayout` and the types
-  `Hotlayout…` are named alike on purpose.
-- **Internal.** Widgets and actions are dispatched on enums instead of string literals; the token
-  name, whole number and absent value rules have one home; the icon file is parsed once; the
-  shared caches sit behind one lock type; the theme colour, gradient and role types are immutable.
-  The whole-string match is now used by the text-span rules as well, so a token name or a colour
-  with a trailing line feed is not read.
-- **Demo.** The showcase reads its document once per app and language instead of on every
-  evaluation of `body`.
 - **Border and rim.** The content of a rounded node is clipped by the inner edge of its border
   (the outer radius less the border width), so the background shows round the corners as it does
   along the straight edges, as in the other readers.
@@ -38,6 +19,16 @@
   at 40 points, as the contract's largest radius), so a glass card keeps nearly the colour of the
   node's background over the page instead of a greyer one. A slight grey cast remains on the
   system blur, more at larger radii.
+
+Behaviour:
+
+- **Sheet drag.** A drag down on a sheet whose body is scrolled scrolls the body back first and
+  moves the sheet only once the body is at its top (`x-sheetDismiss`): the sheet now hears the
+  offset from the scroll view of the body, the same reading as the scrolled look of the app bar.
+  Before, it never learned that the body was scrolled.
+- **Text fields.** A field the platform focused (a tap) is no longer resigned by an update drawn
+  before the screen heard of the focus; such an update committed an open composition and wrote
+  each composed character.
 - **Pictures.** A picture that failed to load is asked for again after a minute, and at once when
   the app becomes active; before, it stayed the placeholder until the app restarted. Decoded
   pictures are kept by address and decoded size, so a screen with a larger `maxPixelSide` no longer
@@ -46,11 +37,44 @@
   a sheet dragged away and replaced before it had left no longer closes the layer that took its
   place. The busy state of a swipe-to-confirm button and the motion of a navigation dot end with
   their view.
-- **Reports.** Every report reaches the newest `onReport` the host passed, once.
-- **Inside.** No state changes while SwiftUI evaluates a body (reports, number transitions, text
-  fields); the safe area is reached over with `ignoresSafeArea` instead of a frame and an offset;
-  the modal stack is generic instead of wrapping screens in `AnyView`; the render context is
-  grouped. What is drawn is unchanged.
+- **Host callbacks.** Every report reaches the newest `onReport` the host passed, once, and every
+  screen-shown event after the first reaches the newest `onScreenChange` (a show that followed a
+  new document or entry went to the handler from before the update).
+
+API:
+
+- **Loaders as members.** `HotlayoutDocument.load(_:)`, `HotlayoutThemeSet.load(_:)`,
+  `HotlayoutVersions.check(_:readerVersion:)`, `HotlayoutVersions.checkDocument(_:)` and
+  `LocaleResolution.resolve(_:available:source:)` replace the global functions `loadDocument`,
+  `loadTheme`, `checkVersion`, `checkDocumentVersion` and `resolveLocale`, which stay as deprecated
+  forwards.
+- **Values for words.** `ScreenEntry.placement`, `ScreenEntry.statusBar`,
+  `ScreenShownEvent.placement`, `ScreenShownEvent.statusBar` and `HotlayoutTheme.appearance` give
+  `modalPlacement`, `statusBarIcons` and `brightness` as enums (`ModalPlacement`, `StatusBarIcons`,
+  `ThemeBrightness`). The string properties `modalPlacement` and `statusBarIcons` of `ScreenEntry`
+  and `ScreenShownEvent`, and `HotlayoutTheme.brightness`, are deprecated.
+- **Documentation.** One-line comments on the public declarations of the model, the JSON value and
+  the actions; the reason for the own JSON parser is stated; the module `HotLayout` and the types
+  `Hotlayout…` are named alike on purpose. The README example reads the document and the theme
+  once, in `.task`, and shows the load error, instead of parsing on every evaluation of `body`.
+
+Inside (what is drawn is unchanged, but for one edge: the text-span rules now match the whole
+string too, so a token name or a colour with a trailing line feed in a span style is not read):
+
+- No state changes while SwiftUI evaluates a body (reports, number transitions, text fields); the
+  safe area is reached over with `ignoresSafeArea` instead of a frame and an offset; the modal
+  stack is generic instead of wrapping screens in `AnyView`; the render context is grouped.
+- Widgets and actions are dispatched on enums instead of string literals; the token name, whole
+  number and absent value rules have one home; the icon file is parsed once; the shared caches sit
+  behind one lock type; the theme colour, gradient and role types are immutable.
+
+Demo:
+
+- The showcase reads its document once per app and language instead of on every evaluation of
+  `body`.
+- `-clock running` (with `-contractSamples`) runs the host's clock from the samples' moment, so a
+  countdown goes down; with the fixed moment of the samples alone it stands, as the host owns the
+  clock.
 
 ## 0.2.0
 
