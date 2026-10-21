@@ -50,9 +50,13 @@ row is checked only for non-empty text.
 - **Glass** (`style.backdropBlur`) blurs what lies under the box with the system blur view, clipped
   by the radius of the node, with the node's background over it. UIKit gives the strength of that
   blur only as a fraction of its effect, so the radius is mapped onto the opacity of the blur view
-  (the whole effect at 20 points). The material's luminance curve, saturation boost and tint layer
-  are taken off, so the colour under the node's own background is the blurred picture, not a greyer
-  one: the area, the order and the colour are the contract's, the exact Gaussian sigma is not. On macOS a material stands in.
+  (the whole effect at 40 points). The system blur also lifts and greys the colour under it, and
+  that cannot be switched off: the reader uses the dark blur on a dark theme (the one that moves
+  the colour least) and the ultra thin material on a light one, and spends only a share of the
+  effect, which weakens the tint with the blur. On the Orbit home screen a Stardust card is within
+  a few colour levels of the other readers, a little greyer; a larger radius is greyer still. The
+  area and the order are the contract's; the exact Gaussian sigma and the exact colour are not.
+  On macOS a material stands in.
 - **Blur under a modal layer**: the blurs of several layers are applied to each picture below once,
   not to the composite.
 

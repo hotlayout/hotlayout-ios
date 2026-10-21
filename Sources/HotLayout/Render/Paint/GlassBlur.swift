@@ -5,7 +5,7 @@ import SwiftUI
 /// blurred. The reader's own surface for it is the system's blur view: UIKit gives the blur
 /// strength only as a fraction of its effect, so the radius (a standard deviation in points,
 /// 1…40) is mapped onto that fraction; the area and the order are the contract's, the exact
-/// sigma is not (see NOTES).
+/// sigma and the exact colour are not (see the platform notes).
 #if canImport(UIKit)
 import UIKit
 
@@ -17,18 +17,8 @@ private final class GlassEffectView: UIVisualEffectView {
         // The material follows the brightness of the THEME, not of the device: a dark screen under a
         // light material would be washed out.
         overrideUserInterfaceStyle = dark ? .dark : .light
-        effect = UIBlurEffect(style: .systemUltraThinMaterial)
+        effect = UIBlurEffect(style: GlassBlur.effectStyle(dark: dark))
         alpha = GlassBlur.strength(forRadius: radius)
-        setNeedsLayout()
-    }
-
-    /// The system material is a blur plus a tint (a luminance curve, a saturation boost and, over
-    /// them, a coloured layer): it lightens and greys whatever lies under it. The contract's glass is
-    /// the blur alone, with the colour of the node's own background over it, so everything but the
-    /// Gaussian filter is taken off the backdrop and the tint layers are hidden.
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        GlassBlur.stripTint(of: self)
     }
 }
 
@@ -68,24 +58,21 @@ extension EnvironmentValues {
 
 enum GlassBlur {
     #if canImport(UIKit)
-    /// Leaves only the blur of a system effect view. The filters are matched by name; a system
-    /// that names them otherwise keeps its material as it is.
-    static func stripTint(of view: UIVisualEffectView) {
-        for (index, sub) in view.subviews.enumerated() {
-            guard let filters = sub.layer.filters, !filters.isEmpty else {
-                // A layer over the backdrop is the tint of the material.
-                if index > 0 { sub.isHidden = true }
-                continue
-            }
-            let blur = filters.filter { ((($0 as AnyObject).value(forKey: "name")) as? String) == "gaussianBlur" }
-            if !blur.isEmpty, blur.count < filters.count { sub.layer.filters = blur }
-        }
+    /// The system blur that adds the least colour of its own. Every system blur also lifts and
+    /// greys what lies under it; of the ones that follow the brightness of the theme, the dark
+    /// one moves the colour of a dark screen least, and the ultra thin material the colour of a
+    /// light one.
+    static func effectStyle(dark: Bool) -> UIBlurEffect.Style {
+        dark ? .dark : .systemUltraThinMaterial
     }
     #endif
 
-    /// The share of the system blur that stands for a radius: the whole effect at 20 points.
+    /// The share of the system blur that stands for a radius: the whole effect at 40 points, the
+    /// largest radius of the contract. The system blur cannot be had without its tint, and the tint
+    /// weakens with the same opacity as the blur, so a small share is the price of a colour near
+    /// the one under a plain blur.
     static func strength(forRadius radius: Int) -> CGFloat {
-        CGFloat(min(1, Double(max(1, radius)) / 20))
+        CGFloat(min(1, Double(max(1, radius)) / 40))
     }
 }
 

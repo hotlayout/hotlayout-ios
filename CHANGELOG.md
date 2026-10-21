@@ -5,8 +5,11 @@
 - **Border and rim.** The content of a rounded node is clipped by the inner edge of its border
   (the outer radius less the border width), so the background shows round the corners as it does
   along the straight edges, as in the other readers.
-- **Glass.** Only the Gaussian blur of the system effect is kept; its luminance curve, saturation
-  boost and tint layer, which greyed the colour of the node's background, are removed.
+- **Glass.** The blur follows the theme with the system blur that changes the colour under it
+  least (dark on a dark theme), and the radius maps onto a smaller share of the effect (the whole
+  at 40 points, as the contract's largest radius), so a glass card keeps nearly the colour of the
+  node's background over the page instead of a greyer one. A slight grey cast remains on the
+  system blur, more at larger radii.
 
 ## 0.2.0
 
