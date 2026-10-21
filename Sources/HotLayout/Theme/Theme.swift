@@ -183,6 +183,7 @@ public struct HotlayoutThemeSet: Equatable, Sendable {
     /// equality. `HotlayoutScreen` hands these to `onReport` with its own.
     public internal(set) var reports: [HotlayoutReport] = []
 
+    /// The same themes: the version, the default and every theme. The `reports` of the read are not compared.
     public static func == (lhs: HotlayoutThemeSet, rhs: HotlayoutThemeSet) -> Bool {
         lhs.themeContractVersion == rhs.themeContractVersion && lhs.defaultThemeId == rhs.defaultThemeId && lhs.themes == rhs.themes
     }

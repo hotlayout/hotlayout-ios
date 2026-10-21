@@ -38,6 +38,19 @@
   at 40 points, as the contract's largest radius), so a glass card keeps nearly the colour of the
   node's background over the page instead of a greyer one. A slight grey cast remains on the
   system blur, more at larger radii.
+- **Pictures.** A picture that failed to load is asked for again after a minute, and at once when
+  the app becomes active; before, it stayed the placeholder until the app restarted. Decoded
+  pictures are kept by address and decoded size, so a screen with a larger `maxPixelSide` no longer
+  gets a picture another screen decoded smaller.
+- **Presses and timers.** A second press during the return of the first keeps the control pressed;
+  a sheet dragged away and replaced before it had left no longer closes the layer that took its
+  place. The busy state of a swipe-to-confirm button and the motion of a navigation dot end with
+  their view.
+- **Reports.** Every report reaches the newest `onReport` the host passed, once.
+- **Inside.** No state changes while SwiftUI evaluates a body (reports, number transitions, text
+  fields); the safe area is reached over with `ignoresSafeArea` instead of a frame and an offset;
+  the modal stack is generic instead of wrapping screens in `AnyView`; the render context is
+  grouped. What is drawn is unchanged.
 
 ## 0.2.0
 

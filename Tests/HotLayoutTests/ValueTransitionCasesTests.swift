@@ -106,14 +106,14 @@ final class ValueTransitionCasesTests: XCTestCase {
     private let points = ValueTransition.Target(path: "user.points", scale: true)
 
     func testFirstShowDoesNotTransition() {
-        let engine = ValueTransitionEngine()
+        var engine = ValueTransitionEngine()
         engine.sync(targets: [points], read: { _ in .number(10) }, leads: true, localeKey: "en", reducedMotion: false)
         XCTAssertFalse(engine.isRunning)
         XCTAssertEqual(engine.shown(["user.points": .number(10)]).smooth["user.points"], .number(10))
     }
 
     func testAChangeLeadsFromTheOldValueAndEndsOnTheNew() {
-        let engine = ValueTransitionEngine()
+        var engine = ValueTransitionEngine()
         engine.sync(targets: [points], read: { _ in .number(0) }, leads: true, localeKey: "en", reducedMotion: false)
         engine.sync(targets: [points], read: { _ in .number(100) }, leads: true, localeKey: "en", reducedMotion: false)
         XCTAssertTrue(engine.isRunning)
@@ -129,7 +129,7 @@ final class ValueTransitionCasesTests: XCTestCase {
     }
 
     func testAnInterruptionStartsFromTheShownValueWithTheFullDuration() {
-        let engine = ValueTransitionEngine()
+        var engine = ValueTransitionEngine()
         engine.sync(targets: [points], read: { _ in .number(0) }, leads: true, localeKey: "en", reducedMotion: false)
         engine.sync(targets: [points], read: { _ in .number(100) }, leads: true, localeKey: "en", reducedMotion: false)
         engine.tick(0)
@@ -145,7 +145,7 @@ final class ValueTransitionCasesTests: XCTestCase {
 
     func testNoTransitionWithoutTheFieldWithReducedMotionOrAChangedLanguage() {
         for (leads, reduced, locale) in [(false, false, "en"), (true, true, "en"), (true, false, "uk")] {
-            let engine = ValueTransitionEngine()
+            var engine = ValueTransitionEngine()
             engine.sync(targets: [points], read: { _ in .number(0) }, leads: true, localeKey: "en", reducedMotion: false)
             engine.sync(targets: [points], read: { _ in .number(100) }, leads: leads, localeKey: locale, reducedMotion: reduced)
             XCTAssertFalse(engine.isRunning, "leads \(leads), reduced \(reduced), locale \(locale)")
@@ -153,7 +153,7 @@ final class ValueTransitionCasesTests: XCTestCase {
     }
 
     func testAnAppearanceGrowsFromZeroAndAChangeWithoutTheFieldEndsIt() {
-        let engine = ValueTransitionEngine()
+        var engine = ValueTransitionEngine()
         engine.appear(targets: [points], read: { _ in .number(80) }, reducedMotion: false)
         engine.sync(targets: [points], read: { _ in .number(80) }, leads: false, localeKey: "en", reducedMotion: false)
         engine.tick(0)
@@ -165,7 +165,7 @@ final class ValueTransitionCasesTests: XCTestCase {
     }
 
     func testALiteralValueAppearsUnderItsOwnKey() {
-        let engine = ValueTransitionEngine()
+        var engine = ValueTransitionEngine()
         let literal = ValueTransition.Target(path: ValueTransition.literalKey, scale: true)
         engine.appear(targets: [literal], read: { $0 == ValueTransition.literalKey ? .number(87) : nil }, reducedMotion: false)
         engine.tick(10)
@@ -176,7 +176,7 @@ final class ValueTransitionCasesTests: XCTestCase {
 
     func testReducedMotionAndZeroDoNotAppear() {
         for (value, reduced) in [(JSONValue.number(80), true), (JSONValue.number(0), false), (JSONValue.string("80"), false)] {
-            let engine = ValueTransitionEngine()
+            var engine = ValueTransitionEngine()
             engine.appear(targets: [points], read: { _ in value }, reducedMotion: reduced)
             XCTAssertFalse(engine.isRunning)
         }

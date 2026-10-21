@@ -267,11 +267,19 @@ struct NavBadgeDot: View {
             before = now
             started = Date()
             change = moving
-            let duration = moving == .appear ? NavBarRules.appearMs : NavBarRules.disappearMs
-            if moving != .none {
-                DispatchQueue.main.asyncAfter(deadline: .now() + duration / 1000) { if change == moving { change = .none } }
-            }
         }
+        // Each change starts its own motion; a dot that goes away ends it.
+        .task(id: started) { await settle() }
+    }
+
+    /// The end of a motion: the dot stands still again.
+    @MainActor
+    private func settle() async {
+        guard change != .none else { return }
+        let duration = change == .appear ? NavBarRules.appearMs : NavBarRules.disappearMs
+        try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000))
+        guard !Task.isCancelled else { return }
+        change = .none
     }
 
     private func dotView(_ dot: (left: Double, top: Double, size: Double), scale: Double, opacity: Double) -> some View {

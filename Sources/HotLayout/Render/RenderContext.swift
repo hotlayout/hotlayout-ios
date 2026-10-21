@@ -2,64 +2,179 @@ import SwiftUI
 
 /// What every node of a screen needs to draw: the theme, the data, the language and the way
 /// back to the screen for presses. Passed down explicitly, one value per node.
+///
+/// Three groups and the values that change from node to node: `screen` is the same for every
+/// node of one screen, `list` says where a node stands in lists from data, `bar` is what the
+/// chrome zones (app bar, bar of navigation) hand to their content. The flat properties below
+/// read and write those groups.
 struct RenderContext {
-    let resolver: StyleResolver
-    let screenId: String
-    let localization: DocumentLocalization?
-    let locale: LocaleResolution
+    /// The same for every node of one screen.
+    struct ScreenEnv {
+        let resolver: StyleResolver
+        let screenId: String
+        let localization: DocumentLocalization?
+        let locale: LocaleResolution
+        let timeZone: TimeZone?
+        let rightToLeft: Bool
+        let sink: ReportSink
+        let images: ImagePolicy
+        /// Hands a press to the screen together with the list instances the node is drawn inside,
+        /// and says who ran it and which task the host answered with, when it gave one.
+        let pressHandler: (JSONObject, DocumentNode, [ListInstance]) -> PressRun
+        /// The word of the reader for the back arrow of an app bar (`ScreenLabels.back`).
+        var backLabel: String
+        /// Writes a value under a data path: into the session of the screen and to the host at the same
+        /// moment (inputs, choices, write actions). `nil` where nobody owns a session.
+        var write: ((String, JSONValue) -> Void)?
+        /// The form of the screen.
+        var form: ScreenForm?
+        /// What the carousels of the stack remember, and the frame of the stack this screen is.
+        var carousels: CarouselMemory?
+        var frameIndex = 0
+        /// The list budget of the screen (`x-listBudget`); `nil` outside a screen, where a list draws every record it would.
+        var listBudget: ListBudget.Plan?
+        /// The width class of the box this screen is drawn in; one class for the whole screen.
+        var widthClass = WidthClass.compact
+    }
+
+    /// Where a node stands in lists from data and among its siblings.
+    struct ListEnv {
+        /// Repeater instances this node is drawn inside, outer first (empty outside a list).
+        var instances: [ListInstance] = []
+        /// The indexes of those instances (the key of a carousel's state).
+        var instancePath: [Int] = []
+        /// Where this node stands among its siblings, set by the parent that lays them out and read
+        /// by a list item (`Text.marker`); descendants of the node do not inherit it.
+        var position: ListPosition?
+        /// The place of the node in a numbered list from data (`Text.marker: number` as the template
+        /// of a `Repeater`): its number among the drawn instances and how many records were drawn.
+        var number: ListNumber?
+        /// The choice of the nearest `ChoiceGroup` above the node.
+        var choice: ChoiceScope?
+    }
+
+    /// What the chrome zones of the screen hand to their content.
+    struct BarEnv {
+        /// The body of the screen is scrolled far enough for the app bar to change (`styleScrolled`).
+        var scrolled = false
+        /// The top safe inset the app bar zone holds inside its box, above its content.
+        var inset = 0.0
+        /// The bottom safe inset the navigation bar holds under its items (zero when it floats: the
+        /// inset then lies under its box).
+        var navInset = 0.0
+        /// The width of the built-in top line of the navigation bar the item belongs to; the item
+        /// takes it into its touch area.
+        var navLine = 0.0
+        /// The widest content of the screen (`Screen.contentMaxWidth`) for the zones that draw their own
+        /// column: the app bar and the bar of navigation. `nil` elsewhere.
+        var contentMaxWidth: Double?
+        /// The bar of navigation whose items stand in the app bar this context draws (`NavBar.widePlacement`).
+        var nav: DocumentNode?
+        /// The nav item stands at the top: in the app bar or in a bar of its own.
+        var navAtTop = false
+    }
+
+    var screen: ScreenEnv
+    var list = ListEnv()
+    var bar = BarEnv()
+    /// The data the node reads: the host's data under the session and the record.
     var scope: DataScope
-    let timeZone: TimeZone?
+    /// The moment countdowns and «days until» count from, in milliseconds since 1970.
     var now: Double
-    let rightToLeft: Bool
+    /// What the node inherits from its ancestors (colour, text style, emphasis).
     var inherited: InheritedLook
-    let sink: ReportSink
-    let images: ImagePolicy
-    /// Hands a press to the screen together with the list instances the node is drawn inside,
-    /// and says who ran it and which task the host answered with, when it gave one.
-    let pressHandler: (JSONObject, DocumentNode, [ListInstance]) -> PressRun
-    /// Repeater instances this node is drawn inside, outer first (empty outside a list).
-    var instances: [ListInstance] = []
-    /// Where this node stands among its siblings, set by the parent that lays them out and read
-    /// by a list item (`Text.marker`); descendants of the node do not inherit it.
-    var listPosition: ListPosition?
-    /// The place of the node in a numbered list from data (`Text.marker: number` as the template
-    /// of a `Repeater`): its number among the drawn instances and how many records were drawn.
-    var listNumber: ListNumber?
-    /// The body of the screen is scrolled far enough for the app bar to change (`styleScrolled`).
-    var barScrolled = false
-    /// The top safe inset the app bar zone holds inside its box, above its content.
-    var barInset = 0.0
-    /// The bottom safe inset the navigation bar holds under its items (zero when it floats: the
-    /// inset then lies under its box).
-    var navInset = 0.0
-    /// The width of the built-in top line of the navigation bar the item belongs to; the item
-    /// takes it into its touch area.
-    var navLine = 0.0
-    /// The word of the reader for the back arrow of an app bar (it has no text of its own).
-    var backLabel = "Back"
-    /// Writes a value under a data path: into the session of the screen and to the host at the same
-    /// moment (inputs, choices, write actions). `nil` where nobody owns a session.
-    var write: ((String, JSONValue) -> Void)?
-    /// The form of the screen the node stands on.
-    var form: ScreenForm?
-    /// The choice of the nearest `ChoiceGroup` above the node.
-    var choice: ChoiceScope?
-    /// What the carousels of the stack remember, the frame of the stack this screen is, and the
-    /// indexes of the list instances the node is drawn inside (the key of a carousel's state).
-    var carousels: CarouselMemory?
-    var frameIndex = 0
-    var instancePath: [Int] = []
-    /// The list budget of the screen being drawn (`x-listBudget`); `nil` outside a screen, where a list draws every record it would.
-    var listBudget: ListBudget.Plan?
-    /// The width class of the box this screen is drawn in; one class for the whole screen.
-    var widthClass = WidthClass.compact
-    /// The widest content of the screen (`Screen.contentMaxWidth`) for the zones that draw their own
-    /// column: the app bar and the bar of navigation. `nil` elsewhere.
-    var contentMaxWidth: Double?
-    /// The bar of navigation whose items stand in the app bar this context draws (`NavBar.widePlacement`).
-    var barNav: DocumentNode?
-    /// The nav item stands at the top: in the app bar or in a bar of its own.
-    var navAtTop = false
+
+    init(
+        resolver: StyleResolver, screenId: String, localization: DocumentLocalization?, locale: LocaleResolution, scope: DataScope,
+        timeZone: TimeZone?, now: Double, rightToLeft: Bool, inherited: InheritedLook, sink: ReportSink, images: ImagePolicy,
+        pressHandler: @escaping (JSONObject, DocumentNode, [ListInstance]) -> PressRun, backLabel: String = ScreenLabels().back,
+        write: ((String, JSONValue) -> Void)? = nil, carousels: CarouselMemory? = nil, frameIndex: Int = 0
+    ) {
+        screen = ScreenEnv(
+            resolver: resolver, screenId: screenId, localization: localization, locale: locale, timeZone: timeZone, rightToLeft: rightToLeft,
+            sink: sink, images: images, pressHandler: pressHandler, backLabel: backLabel, write: write, carousels: carousels, frameIndex: frameIndex)
+        self.scope = scope
+        self.now = now
+        self.inherited = inherited
+    }
+
+    // MARK: The groups, read flat
+
+    var resolver: StyleResolver { screen.resolver }
+    var screenId: String { screen.screenId }
+    var localization: DocumentLocalization? { screen.localization }
+    var locale: LocaleResolution { screen.locale }
+    var timeZone: TimeZone? { screen.timeZone }
+    var rightToLeft: Bool { screen.rightToLeft }
+    var sink: ReportSink { screen.sink }
+    var images: ImagePolicy { screen.images }
+    var pressHandler: (JSONObject, DocumentNode, [ListInstance]) -> PressRun { screen.pressHandler }
+    var backLabel: String { screen.backLabel }
+    var write: ((String, JSONValue) -> Void)? { screen.write }
+    var form: ScreenForm? {
+        get { screen.form }
+        set { screen.form = newValue }
+    }
+    var carousels: CarouselMemory? { screen.carousels }
+    var frameIndex: Int { screen.frameIndex }
+    var listBudget: ListBudget.Plan? {
+        get { screen.listBudget }
+        set { screen.listBudget = newValue }
+    }
+    var widthClass: WidthClass {
+        get { screen.widthClass }
+        set { screen.widthClass = newValue }
+    }
+
+    var instances: [ListInstance] {
+        get { list.instances }
+        set { list.instances = newValue }
+    }
+    var instancePath: [Int] {
+        get { list.instancePath }
+        set { list.instancePath = newValue }
+    }
+    var listPosition: ListPosition? {
+        get { list.position }
+        set { list.position = newValue }
+    }
+    var listNumber: ListNumber? {
+        get { list.number }
+        set { list.number = newValue }
+    }
+    var choice: ChoiceScope? {
+        get { list.choice }
+        set { list.choice = newValue }
+    }
+
+    var barScrolled: Bool {
+        get { bar.scrolled }
+        set { bar.scrolled = newValue }
+    }
+    var barInset: Double {
+        get { bar.inset }
+        set { bar.inset = newValue }
+    }
+    var navInset: Double {
+        get { bar.navInset }
+        set { bar.navInset = newValue }
+    }
+    var navLine: Double {
+        get { bar.navLine }
+        set { bar.navLine = newValue }
+    }
+    var contentMaxWidth: Double? {
+        get { bar.contentMaxWidth }
+        set { bar.contentMaxWidth = newValue }
+    }
+    var barNav: DocumentNode? {
+        get { bar.nav }
+        set { bar.nav = newValue }
+    }
+    var navAtTop: Bool {
+        get { bar.navAtTop }
+        set { bar.navAtTop = newValue }
+    }
 
     var theme: HotlayoutTheme { resolver.theme }
 
@@ -140,6 +255,11 @@ struct PressRun {
 /// followed); a target it refuses is not followed. Pictures are fetched with a private session that
 /// has no cookie storage, no shared cache, no credentials of the host app and no `Referer`, and
 /// one picture, redirects included, has 30 seconds.
+///
+/// Pictures are kept in one memory cache for the whole app, by address and decoded size: two
+/// screens that show the same address at the same `maxPixelSide` share one download. An address
+/// remembers the policy that resolved it last; its redirects and its byte limit follow that one.
+/// An address that failed is asked for again after a minute, or when the app becomes active.
 public struct ImagePolicy: Sendable {
     /// The default for `maxDownloadBytes`: 10 MiB (10 485 760 bytes) for one picture.
     public static let defaultMaxDownloadBytes = 10 * 1024 * 1024

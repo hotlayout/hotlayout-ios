@@ -24,15 +24,14 @@ struct InputTextFieldWidget: View {
 
     @State private var state = InputRules.TextState()
     @State private var wasFocused = false
-    /// Bumped on every report of the native control, so the view is updated and the control is
-    /// made to show what the rules hold (a text cut to the limit).
-    @State private var tick = 0
+    /// Bumped on every report of the native control and handed to it: the control is made to show
+    /// what the rules hold even when that is what it held before (a text cut to the limit).
+    @State private var revision = 0
     @State private var localFocus: String?
     /// The stand-in field of macOS takes the focus from SwiftUI; the native control of iOS from UIKit.
     @FocusState private var standInFocus: String?
 
     var body: some View {
-        let _ = tick  // read, so that a report of the native control updates the view
         let look = InputLook(context: context)
         let numeric = InputRules.isNumber(valueType: node.props["valueType"])
         let path = InputRules.path(of: node.props["value"])
@@ -204,14 +203,14 @@ struct InputTextFieldWidget: View {
             // it is neither kept nor written.
             if case .input(let new) = event, !state.composing, !(state.touched || focused) { event = .platformFill(new) }
             self.apply(event, numeric: numeric, bound: bound, boundText: boundText, path: numericPath, disabled: disabled)
-            tick += 1
+            revision += 1
         }
         let binding = Binding<String>(get: { shown }, set: { apply(.input($0)) })
         return HStack(alignment: lines > 1 ? .top : .center, spacing: look.spacing(InputPartsRules.gapToken)) {
             if let prefix { markView(prefix, look: look, focus: focus, disabled: disabled) }
             field(
                 binding: binding, shown: shown, label: label, hint: heard, lines: lines, numeric: numeric, focus: focus, focused: focused, disabled: disabled,
-                look: look, onEvent: apply
+                look: look, revision: revision, onEvent: apply
             )
             .environment(\.layoutDirection, contentLeftToRight ? .leftToRight : screenDirection)
             .frame(maxWidth: .infinity)
@@ -235,10 +234,12 @@ struct InputTextFieldWidget: View {
         #endif
     }
 
+    /// The field itself; `revision` reaches the native control of iOS (the stand-in of macOS is
+    /// drawn again with the body it belongs to).
     @ViewBuilder
     private func field(
         binding: Binding<String>, shown: String, label: String, hint: String, lines: Int, numeric: Bool, focus: Binding<String?>, focused: Bool, disabled: Bool,
-        look: InputLook, onEvent: @escaping (InputRules.Event) -> Void
+        look: InputLook, revision: Int, onEvent: @escaping (InputRules.Event) -> Void
     ) -> some View {
         let placeholder = node.props["placeholder"] == nil ? "" : context.text(node, field: "placeholder")
         let action = keyAction()
@@ -254,7 +255,7 @@ struct InputTextFieldWidget: View {
             autocorrect: !(keyboard != .text && keyboard != nil), contentType: hints ? Self.contentType(keyboard) : nil,
             returnKey: action == .next ? .next : .done, screenRightToLeft: context.rightToLeft,
             contentLeftToRight: InputRules.contentIsLeftToRight(node.props["keyboard"], lines: node.props["lines"], numeric: numeric),
-            enabled: !disabled, focused: focused, label: label, hint: hint,
+            enabled: !disabled, focused: focused, label: label, hint: hint, revision: revision,
             onChange: { change in
                 switch change {
                 case .focus(let now):

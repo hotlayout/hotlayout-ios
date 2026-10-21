@@ -12,35 +12,64 @@ typealias PlatformImage = NSImage
 private struct Decoded: @unchecked Sendable { let image: PlatformImage? }
 
 /// The memory cache of decoded pictures and the loads in flight, shared by every image of every
-/// screen: a picture in a list of rows is fetched once, and a picture that failed is not asked
-/// for again until the cache is emptied.
+/// screen: a picture in a list of rows is fetched once. A picture is kept by its address AND the
+/// side it was decoded at, so screens with different `maxPixelSide` do not share a decode. A
+/// picture that failed is not asked for again for `failureLifetime`, or until the app becomes
+/// active again (the network may be back).
 @MainActor
 final class ImageStore {
     static let shared = ImageStore()
 
-    private let cache = NSCache<NSURL, PlatformImage>()
-    private var inFlight: [URL: Task<Decoded, Never>] = [:]
-    private var failed: Set<URL> = []
+    /// How long a failed address is not asked for again.
+    static let failureLifetime: TimeInterval = 60
 
-    init() {
+    private let cache = NSCache<NSString, PlatformImage>()
+    private var inFlight: [String: Task<Decoded, Never>] = [:]
+    private var failed: [String: Date] = [:]
+    private let now: () -> Date
+    private var activation: NSObjectProtocol?
+
+    init(now: @escaping () -> Date = Date.init) {
+        self.now = now
         cache.totalCostLimit = 64 * 1024 * 1024
         cache.countLimit = 200
+        #if canImport(UIKit)
+        activation = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.forgetFailures() }
+        }
+        #endif
     }
 
-    func cached(_ url: URL) -> PlatformImage? { cache.object(forKey: url as NSURL) }
+    deinit {
+        if let activation { NotificationCenter.default.removeObserver(activation) }
+    }
+
+    /// The key of a picture: the address and the longest side it is decoded at.
+    private static func key(_ url: URL, maxSide: Int) -> String { "\(maxSide) \(url.absoluteString)" }
+
+    private func key(_ url: URL) -> String { Self.key(url, maxSide: ImageSources.shared.entry(for: url).limits.maxSide) }
+
+    func cached(_ url: URL) -> PlatformImage? { cache.object(forKey: key(url) as NSString) }
 
     func reset() {
         cache.removeAllObjects()
         failed.removeAll()
     }
 
+    /// Lets every failed address be asked for again.
+    func forgetFailures() { failed.removeAll() }
+
     /// The picture at the address, or `nil` when it cannot be had (a bad status, not a picture).
     func image(for url: URL) async -> PlatformImage? {
-        if let hit = cached(url) { return hit }
-        if failed.contains(url) { return nil }
-        if let running = inFlight[url] { return await running.value.image }
+        let entry = ImageSources.shared.entry(for: url)
+        let key = Self.key(url, maxSide: entry.limits.maxSide)
+        if let hit = cache.object(forKey: key as NSString) { return hit }
+        if let failedAt = failed[key] {
+            if now().timeIntervalSince(failedAt) < Self.failureLifetime { return nil }
+            failed[key] = nil
+        }
+        if let running = inFlight[key] { return await running.value.image }
         let task = Task.detached(priority: .utility) { () -> Decoded in
-            let entry = ImageSources.shared.entry(for: url)
             guard let data = await BoundedDownload(entry: entry).run(url),
                 let cg = BoundedDecode.cgImage(data, maxSide: entry.limits.maxSide)
             else { return Decoded(image: nil) }
@@ -50,13 +79,13 @@ final class ImageStore {
             return Decoded(image: NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)))
             #endif
         }
-        inFlight[url] = task
+        inFlight[key] = task
         let image = await task.value.image
-        inFlight[url] = nil
+        inFlight[key] = nil
         if let image {
-            cache.setObject(image, forKey: url as NSURL, cost: Int(image.size.width * image.size.height * 4))
+            cache.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.size.height * 4))
         } else if !Task.isCancelled {
-            failed.insert(url)
+            failed[key] = now()
         }
         return image
     }

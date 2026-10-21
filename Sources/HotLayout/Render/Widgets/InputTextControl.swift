@@ -46,6 +46,9 @@ struct InputTextControl: UIViewRepresentable {
     var focused: Bool
     var label: String
     var hint: String
+    /// Grows with every report of the control, so that a report the rules answer with the same
+    /// text (one cut to the limit) still updates the control.
+    var revision = 0
     var onChange: (InputControlChange) -> Void
 
     func makeCoordinator() -> InputTextCoordinator { InputTextCoordinator() }

@@ -41,6 +41,8 @@ struct SwipeConfirmButton: View {
     @State private var dragging = false
     @State private var captured: Bool?
     @State private var busyToken = 0
+    /// The host's `async` answer to the action of the busy state in progress.
+    @State private var hostTask: Task<Void, Never>?
 
     private var action: JSONObject { node.props["action"]?.objectValue ?? ["type": "none"] }
 
@@ -78,6 +80,8 @@ struct SwipeConfirmButton: View {
             .accessibilityAddTraits(isBusy ? [.isButton, .updatesFrequently] : .isButton)
             .accessibilityAction { complete() }
             .modifier(SwipeKeyboard(act: { complete() }))
+            // Ends with the busy state it waits for, and with the button when its screen goes.
+            .task(id: busyToken) { await holdBusy() }
     }
 
     private func label(room: Double) -> some View {
@@ -155,16 +159,24 @@ struct SwipeConfirmButton: View {
         dragging = false
         busy = true
         progress = 1
+        hostTask = run.task
         busyToken += 1
+    }
+
+    /// Waits for what ends the busy state: the host's task when it gave one, else the longest wait.
+    @MainActor
+    private func holdBusy() async {
+        guard busy else { return }
         let token = busyToken
-        let promise = run.task != nil
-        if let task = run.task {
-            Task { @MainActor in
-                _ = await task.value
-                end(token, on: .fulfilled, promise: true)
-            }
+        if let task = hostTask {
+            await task.value
+            guard !Task.isCancelled else { return }
+            end(token, on: .fulfilled, promise: true)
+        } else {
+            try? await Task.sleep(nanoseconds: UInt64(SwipeConfirmRules.busyMaxMs * 1_000_000))
+            guard !Task.isCancelled else { return }
+            end(token, on: .timeout, promise: false)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + SwipeConfirmRules.busyMaxMs / 1000) { end(token, on: .timeout, promise: promise) }
     }
 
     /// An event of the busy state; the thumb returns when the rule says so. The screen changing is
@@ -172,6 +184,7 @@ struct SwipeConfirmButton: View {
     private func end(_ token: Int, on event: SwipeConfirmRules.BusyEvent, promise: Bool) {
         guard token == busyToken, busy, SwipeConfirmRules.busyOutcome(event, promise: promise) == .giveBack else { return }
         busy = false
+        hostTask = nil
         progress = 0
     }
 }

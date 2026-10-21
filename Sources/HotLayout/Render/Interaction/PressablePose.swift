@@ -19,18 +19,23 @@ struct PressablePose<Content: View>: View {
             .scaleEffect(sunk ? (pose?.scale ?? 1) : 1)
             .opacity(sunk ? (pose?.opacity ?? 1) : 1)
             .onChange(of: pressed) { isPressed in
-                guard kind != nil else { return }
-                if isPressed {
-                    downAt = Date()
-                    withAnimation(Self.curve(PressFeedbackRules.downCurve, ms: PressFeedbackRules.downMs)) { sunk = true }
-                } else {
-                    let elapsed = downAt.map { Date().timeIntervalSince($0) * 1000 } ?? PressFeedbackRules.downMs
-                    let wait = max(0, PressFeedbackRules.downMs - elapsed)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + wait / 1000) {
-                        withAnimation(Self.curve(PressFeedbackRules.upCurve, ms: PressFeedbackRules.upMs)) { sunk = false }
-                    }
-                }
+                guard kind != nil, isPressed else { return }
+                downAt = Date()
+                withAnimation(Self.curve(PressFeedbackRules.downCurve, ms: PressFeedbackRules.downMs)) { sunk = true }
             }
+            // A new press cancels the return of the one before.
+            .task(id: pressed) { await rise() }
+    }
+
+    /// After a release: the rest of the way down, then back up.
+    @MainActor
+    private func rise() async {
+        guard kind != nil, !pressed, sunk else { return }
+        let elapsed = downAt.map { Date().timeIntervalSince($0) * 1000 } ?? PressFeedbackRules.downMs
+        let wait = max(0, PressFeedbackRules.downMs - elapsed)
+        try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000))
+        guard !Task.isCancelled else { return }
+        withAnimation(Self.curve(PressFeedbackRules.upCurve, ms: PressFeedbackRules.upMs)) { sunk = false }
     }
 
     static func curve(_ points: [Double], ms: Double) -> Animation {

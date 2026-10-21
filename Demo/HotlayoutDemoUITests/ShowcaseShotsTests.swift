@@ -25,6 +25,8 @@ final class ShowcaseShotsTests: XCTestCase {
         try app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "\(folder)/\(name)-ios.png"))
     }
 
+    func testObsidianHome() throws { try shot("obsidian-home", app: "obsidian", taps: []) }
+    func testOrbitHome() throws { try shot("orbit-home", app: "orbit", taps: []) }
     func testObsidianQuest() throws { try shot("obsidian-quest", app: "obsidian", taps: [("Quest: ", false)]) }
     func testSunnyQuest() throws { try shot("sunny-quest", app: "sunny", taps: [("Quest: ", false)]) }
     func testOrbitMission() throws { try shot("orbit-mission", app: "orbit", taps: [("Mission: ", false)]) }
