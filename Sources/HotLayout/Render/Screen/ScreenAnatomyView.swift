@@ -150,7 +150,7 @@ struct ScreenRootView: View {
             }
         }
         // The body is cut at the edge of its area (the bottom edge of the inset or of the app bar), not at the edge of the screen.
-        .clipped()
+        .mask(Rectangle())
         .layoutValue(key: ScreenZoneKey.self, value: .body)
     }
 
