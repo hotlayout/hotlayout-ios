@@ -82,8 +82,8 @@ struct ModalBoxLayout: Layout {
 
 /// One modal layer: the scrim and the sheet or the window. The page and the layers below are
 /// drawn by `ModalStack`; this view is only the layer itself.
-struct ModalLayerView: View {
-    let content: AnyView
+struct ModalLayerView<Content: View>: View {
+    let content: Content
     let shape: WideChrome.ModalShape
     let placement: JSONValue?
     let margin: Double
@@ -93,11 +93,28 @@ struct ModalLayerView: View {
     let blurredBy: Double
     let dismiss: (_ animated: Bool) -> Void
 
+    /// `exiting` starts a layer that is already sliding out (`ModalStack` never does; a test does).
+    init(
+        content: Content, shape: WideChrome.ModalShape, placement: JSONValue?, margin: Double, dismissible: Bool, isTop: Bool, blurredBy: Double,
+        exiting: Bool = false, dismiss: @escaping (_ animated: Bool) -> Void
+    ) {
+        self.content = content
+        self.shape = shape
+        self.placement = placement
+        self.margin = margin
+        self.dismissible = dismissible
+        self.isTop = isTop
+        self.blurredBy = blurredBy
+        self.dismiss = dismiss
+        _exiting = State(initialValue: exiting)
+    }
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var offset: CGFloat = 0
     @State private var sheetHeight: CGFloat = 0
     @State private var dragging = false
-    @State private var exiting = false
+    /// The sheet has been dragged away and slides out.
+    @State private var exiting: Bool
     @State private var origin: (scrolled: Double, started: Bool)?
     @State private var samples: [(time: Double, y: Double)] = []
     @State private var sink = ModalScrollSink()
@@ -136,6 +153,17 @@ struct ModalLayerView: View {
         .accessibilityAction(.escape) {
             if ModalRules.escapeSteps(key: "Escape", repeating: false, modalOnTop: isTop, topDismissible: dismissible) > 0 { dismiss(true) }
         }
+        // The layer goes once it has slid out; a layer that is gone first closes nothing.
+        .task(id: exiting) { await leaveAfterExit() }
+    }
+
+    @MainActor
+    private func leaveAfterExit() async {
+        guard exiting else { return }
+        let delay = reduceMotion ? 0 : Double(ModalRules.exitMotion.durationMs) / 1000
+        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        guard !Task.isCancelled else { return }
+        dismiss(false)
     }
 
     private var layerTransition: AnyTransition {
@@ -183,10 +211,7 @@ struct ModalLayerView: View {
             withAnimation(animation(ModalRules.returnMotion)) { offset = 0 }
         case .dismiss:
             exiting = true
-            let motion = ModalRules.exitMotion
-            withAnimation(animation(motion)) { offset = sheetHeight }
-            let delay = reduceMotion ? 0 : Double(motion.durationMs) / 1000
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { dismiss(false) }
+            withAnimation(animation(ModalRules.exitMotion)) { offset = sheetHeight }
         }
     }
 }
@@ -200,24 +225,26 @@ private struct SheetDrag<G: Gesture>: ViewModifier {
     }
 }
 
+/// One modal layer of the stack: how it stands and closes; its content comes from `ModalStack.layer`.
+struct ModalStackLayer: Identifiable {
+    /// The index of the frame in the stack.
+    let id: Int
+    let shape: WideChrome.ModalShape
+    let placement: JSONValue?
+    let blur: Int?
+    let dismissible: Bool
+}
+
 /// The page and the modal layers over it. Every layer is its own stacking context and the page
 /// and the layers below it are inert: the touch and the screen reader reach only the top layer.
 /// Under a layer the picture is blurred by the layer's `backdropBlur`, the scrim lies over the blur.
-struct ModalStack: View {
-    struct Layer: Identifiable {
-        let id: Int
-        let content: AnyView
-        let shape: WideChrome.ModalShape
-        let placement: JSONValue?
-        let blur: Int?
-        let dismissible: Bool
-    }
-
-    let page: AnyView
-    let layers: [Layer]
+struct ModalStack<Page: View, Layer: View>: View {
+    let layers: [ModalStackLayer]
     let margin: Double
     /// `animated` is false after the sheet has already left by a drag.
     let dismiss: (_ animated: Bool) -> Void
+    @ViewBuilder let page: () -> Page
+    @ViewBuilder let layer: (ModalStackLayer) -> Layer
 
     private func blur(above index: Int) -> Double {
         ModalRules.combinedBlur(layers.dropFirst(index + 1).compactMap(\.blur))
@@ -225,17 +252,17 @@ struct ModalStack: View {
 
     var body: some View {
         ZStack {
-            page
+            page()
                 .blur(radius: ModalRules.combinedBlur(layers.compactMap(\.blur)), opaque: true)
                 .allowsHitTesting(layers.isEmpty)
                 .accessibilityHidden(!layers.isEmpty)
-            ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
+            ForEach(Array(layers.enumerated()), id: \.element.id) { index, entry in
                 ModalLayerView(
-                    content: layer.content,
-                    shape: layer.shape,
-                    placement: layer.placement,
+                    content: layer(entry),
+                    shape: entry.shape,
+                    placement: entry.placement,
                     margin: margin,
-                    dismissible: layer.dismissible,
+                    dismissible: entry.dismissible,
                     isTop: index == layers.count - 1,
                     blurredBy: blur(above: index),
                     dismiss: dismiss

@@ -232,9 +232,12 @@ final class ModalCasesTests: XCTestCase {
         let sheet = try Self.document([Self.pageScreen, .object(JSONObject([("screenId", "m"), ("name", "M"), ("presentation", "modal"), ("root", sheetRoot)]))])
         let entry = try XCTUnwrap(sheet.screen("m"))
         let context = Harness.context(rightToLeft: false)
-        let layer = ModalStack.Layer(id: 1, content: AnyView(ScreenRootView(root: entry.root, context: context, shrinks: true)), shape: window ? .window : .sheet, placement: window ? "center" : nil, blur: blur, dismissible: dismissible)
-        let view = ModalStack(page: AnyView(Color(red: 1, green: 0, blue: 0)), layers: [layer], margin: 24, dismiss: { _ in })
-            .frame(width: 393, height: 852)
+        let layer = ModalStackLayer(id: 1, shape: window ? .window : .sheet, placement: window ? "center" : nil, blur: blur, dismissible: dismissible)
+        let view = ModalStack(
+            layers: [layer], margin: 24, dismiss: { _ in }, page: { Color(red: 1, green: 0, blue: 0) },
+            layer: { _ in ScreenRootView(root: entry.root, context: context, shrinks: true) }
+        )
+        .frame(width: 393, height: 852)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 1
         return Pixels(try XCTUnwrap(renderer.cgImage))
@@ -267,8 +270,11 @@ final class ModalCasesTests: XCTestCase {
         let context = Harness.context(rightToLeft: false)
         func edge(blur: Int?) throws -> Int {
             let page = HStack(spacing: 0) { Color.white; Color.black }
-            let layer = ModalStack.Layer(id: 1, content: AnyView(ScreenRootView(root: try XCTUnwrap(doc.screen("m")).root, context: context, shrinks: true)), shape: .sheet, placement: nil, blur: blur, dismissible: true)
-            let renderer = ImageRenderer(content: ModalStack(page: AnyView(page), layers: [layer], margin: 24, dismiss: { _ in }).frame(width: 200, height: 200))
+            let root = try XCTUnwrap(doc.screen("m")).root
+            let layer = ModalStackLayer(id: 1, shape: .sheet, placement: nil, blur: blur, dismissible: true)
+            let stack = ModalStack(
+                layers: [layer], margin: 24, dismiss: { _ in }, page: { page }, layer: { _ in ScreenRootView(root: root, context: context, shrinks: true) })
+            let renderer = ImageRenderer(content: stack.frame(width: 200, height: 200))
             renderer.scale = 1
             let pixels = Pixels(try XCTUnwrap(renderer.cgImage))
             return try XCTUnwrap(pixels.rgb(96, 100)).r

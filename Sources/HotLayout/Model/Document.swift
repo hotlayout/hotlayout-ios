@@ -80,6 +80,20 @@ public struct HotlayoutDocument: Equatable, Sendable {
         screens.first { $0.screenId == screenId }
     }
 
+    /// A digest of what `==` compares, made once when the document is read: the screen keys its
+    /// reaction to a new document on it instead of comparing the whole tree on every update.
+    let contentHash: Int
+
+    /// The identity of the drawable content (see `==`), cheap to compare.
+    var contentKey: ContentKey { ContentKey(documentId: documentId, hash: contentHash) }
+
+    struct ContentKey: Equatable {
+        let documentId: String
+        let hash: Int
+    }
+
+    /// The same drawable content: the version, the id, the screens, the entry points and the
+    /// translations. The `name` and the `reports` of the read are not compared.
     public static func == (lhs: HotlayoutDocument, rhs: HotlayoutDocument) -> Bool {
         lhs.documentId == rhs.documentId && lhs.schemaVersion == rhs.schemaVersion && lhs.screens == rhs.screens
             && lhs.localization == rhs.localization && lhs.entryPoints == rhs.entryPoints
@@ -187,8 +201,40 @@ enum DocumentReader {
             entryPoints: entryPoints,
             screens: screens,
             localization: localization(object["localization"], sink: sink),
-            reports: sink.reports
+            reports: sink.reports,
+            contentHash: contentHash(of: object)
         )
+    }
+
+    /// The fields `HotlayoutDocument.==` compares, hashed as JSON (the order of the keys of an
+    /// object does not count, as it does not for equality).
+    static func contentHash(of object: JSONObject) -> Int {
+        var hasher = Hasher()
+        for key in ["schemaVersion", "documentId", "initialScreenId", "entryPoints", "screens", "localization"] {
+            hasher.combine(key)
+            feed(object[key] ?? .null, into: &hasher)
+        }
+        return hasher.finalize()
+    }
+
+    private static func feed(_ value: JSONValue, into hasher: inout Hasher) {
+        switch value {
+        case .null: hasher.combine(0)
+        case .bool(let flag): hasher.combine(1); hasher.combine(flag)
+        case .number(let number): hasher.combine(2); hasher.combine(number)
+        case .string(let text): hasher.combine(3); hasher.combine(text)
+        case .array(let items):
+            hasher.combine(4)
+            hasher.combine(items.count)
+            for item in items { feed(item, into: &hasher) }
+        case .object(let object):
+            hasher.combine(5)
+            hasher.combine(object.count)
+            for key in object.keys.sorted() {
+                hasher.combine(key)
+                feed(object[key] ?? .null, into: &hasher)
+            }
+        }
     }
 
     /// Reads one node. A child that is not an object or has no type is skipped and reported;

@@ -1,10 +1,16 @@
+import Combine
 import SwiftUI
 
 /// Where a press came from: the node, the screen, and the record the node reads.
 public struct ActionSource: Equatable, Sendable {
+    /// The node pressed; `modal-dismiss` (`layerDismissal`) for a layer closed by a tap on its scrim
+    /// or by a drag, which no node of the document asked for.
     public let nodeId: String
     public let screenId: String
     public let record: DataScope?
+
+    /// The `nodeId` of a modal layer closed by its scrim or by a drag.
+    public static let layerDismissal = "modal-dismiss"
 }
 
 /// Texts that belong to the reader rather than to the document; pass them in the language of
@@ -61,6 +67,8 @@ public struct HotlayoutScreen: View {
     /// Lives as long as the screen does, not as long as one value of this view: a parent that
     /// draws again makes a new `HotlayoutScreen`, and the reports must not start over.
     @State private var sink = ReportSink()
+    /// Fires on the main queue, after the frame, when there may be reports to hand over.
+    @State private var reportsAdded = PassthroughSubject<Void, Never>()
 
     /// - Parameters:
     ///   - document: a document from `loadDocument`.
@@ -171,8 +179,6 @@ public struct HotlayoutScreen: View {
     }
 
     public var body: some View {
-        // The newest `onReport` of the host hears what the sink gets from now on, also after the first frame.
-        let _: Void = observeReports()
         let flow = currentFlow
         let resolution = Localization.resolve(document.localization, requested: locale)
         let rightToLeft = TextDirectionRule.isRightToLeft(resolution.directionLocale) ?? false
@@ -183,43 +189,45 @@ public struct HotlayoutScreen: View {
             } ?? 0
         let pageScreen = frames.indices.contains(pageIndex) ? document.screen(frames[pageIndex].screenId) : nil
 
-        // The reader asks the insets of a view that respects the safe area, then reaches over them with
-        // the screen itself (a view that ignores the safe area is told the insets are zero).
+        // The insets are read from the reader, which respects the safe area; the stack reaches over
+        // the top and bottom ones itself (a view that ignores the safe area is told they are zero).
         GeometryReader { area in
             let insets = ScreenInsets(top: Double(area.safeAreaInsets.top), bottom: Double(area.safeAreaInsets.bottom))
             // One class for the whole screen, from the box the host gave it: a page takes the class of
             // that box, a modal layer is always compact (its own box is narrower than 600).
             let areaWidth = Double(area.size.width)
-            let areaClass = WidthClass.of(width: areaWidth)
-            let place = ScreenPlace(resolution: resolution, rightToLeft: rightToLeft, areaClass: areaClass)
+            let place = ScreenPlace(resolution: resolution, rightToLeft: rightToLeft, areaClass: WidthClass.of(width: areaWidth))
+            let layerScreens = Dictionary(
+                uniqueKeysWithValues: frames.indices.filter { $0 > pageIndex }.compactMap { index in document.screen(frames[index].screenId).map { (index, $0) } })
             ModalStack(
-                page: pageScreen.map { screen in
-                    AnyView(screenView(screen, frame: frames[pageIndex], index: pageIndex, place: place, insets: insets, asLayer: false))
-                } ?? AnyView(Color.clear),
-                layers: frames.indices.filter { $0 > pageIndex }.compactMap { index in
-                    guard let screen = document.screen(frames[index].screenId) else { return nil }
-                    let shape = WideChrome.modalShape(placement: screen.modalPlacement.map(JSONValue.string), areaWidth: areaWidth)
-                    // A layer holds no top inset; a sheet holds the bottom one under its content, a window none.
-                    let layerInsets = ScreenInsets(top: 0, bottom: shape == .sheet ? insets.bottom : 0)
-                    return ModalStack.Layer(
-                        id: index,
-                        content: AnyView(
-                            screenView(
-                                screen, frame: frames[index], index: index, place: place, insets: layerInsets, asLayer: true, sheetWindow: shape == .sheetWindow
-                            )),
-                        shape: shape,
-                        placement: screen.modalPlacement.map(JSONValue.string),
-                        blur: screen.backdropBlur,
-                        dismissible: screen.dismissible
-                    )
+                layers: layerScreens.keys.sorted().compactMap { index in
+                    layerScreens[index].map { screen in
+                        let placement = screen.modalPlacement.map(JSONValue.string)
+                        return ModalStackLayer(
+                            id: index, shape: WideChrome.modalShape(placement: placement, areaWidth: areaWidth), placement: placement,
+                            blur: screen.backdropBlur, dismissible: screen.dismissible)
+                    }
                 },
                 margin: StyleResolver(theme: themeSet.theme(themeId)).spacing(.string("xl")) ?? ModalRules.defaultMargin,
-                dismiss: { animated in
-                    _ = perform(["type": "navigate.back"], node: DocumentNode(id: "modal-dismiss", type: "Screen"), animated: animated)
+                dismiss: dismissLayer,
+                page: {
+                    if let pageScreen {
+                        screenView(pageScreen, frame: frames[pageIndex], index: pageIndex, place: place, insets: insets, asLayer: false)
+                    } else {
+                        Color.clear
+                    }
+                },
+                layer: { layer in
+                    if let screen = layerScreens[layer.id] {
+                        // A layer holds no top inset; a sheet holds the bottom one under its content, a window none.
+                        screenView(
+                            screen, frame: frames[layer.id], index: layer.id, place: place,
+                            insets: ScreenInsets(top: 0, bottom: layer.shape == .sheet ? insets.bottom : 0), asLayer: true,
+                            sheetWindow: layer.shape == .sheetWindow)
+                    }
                 }
             )
-            .frame(width: area.size.width, height: area.size.height + CGFloat(insets.top + insets.bottom))
-            .offset(y: -area.safeAreaInsets.top)
+            .ignoresSafeArea(.all, edges: .vertical)
         }
         .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight)
         .environment(\.glassOnDarkTheme, themeSet.theme(themeId).brightness == "dark")
@@ -231,13 +239,20 @@ public struct HotlayoutScreen: View {
                 if let event = started.shownEvent(cause: .entry) { onScreenChange?(event) }
                 record(document.reports + themeSet.reports)
             }
+            // Reports added later (a picture that failed, a report of drawing) are delivered too.
+            let added = reportsAdded
+            sink.observe { DispatchQueue.main.async { added.send() } }
             deliverReports()
         }
-        .onChange(of: document) { newDocument in
+        .onDisappear { sink.observe(nil) }
+        // The action of `onReceive` is the one of the newest body (that of `onChange` is not), so the
+        // host's newest `onReport` hears every report.
+        .onReceive(reportsAdded) { handOverReports() }
+        .onChange(of: DrawnDocument(document: document)) { new in
             var updated = currentFlow
-            if let event = updated.update(document: FlowDocument(newDocument)) { onScreenChange?(event) }
+            if let event = updated.update(document: FlowDocument(new.document)) { onScreenChange?(event) }
             self.flow = updated
-            record(newDocument.reports)
+            record(new.document.reports)
             deliverReports()
         }
         .onChange(of: data) { newData in
@@ -254,6 +269,14 @@ public struct HotlayoutScreen: View {
             self.flow = updated
             deliverReports()
         }
+    }
+
+    /// The document as `onChange` compares it: by its id and the digest of its drawable content,
+    /// made once when it was read, not by walking the tree on every update.
+    private struct DrawnDocument: Equatable {
+        let document: HotlayoutDocument
+
+        static func == (lhs: DrawnDocument, rhs: DrawnDocument) -> Bool { lhs.document.contentKey == rhs.document.contentKey }
     }
 
     /// What every screen of the stack shares: the language and the class of the area.
@@ -292,9 +315,11 @@ public struct HotlayoutScreen: View {
         context.widthClass = widthClass
         // One plan per screen, made before anything is drawn: a list cannot know what the lists before it drew.
         let budget = ListBudget.plan(root: root, scope: scope)
-        if let report = budget.report(screenId: screen.screenId) { sink.add(.ignoredInput, report.location, report.reason) }
         context.listBudget = budget
+        let report = budget.report(screenId: screen.screenId).map { HotlayoutReport(kind: .ignoredInput, location: $0.location, reason: $0.reason) }
         return ScreenRootView(root: root, context: context, shrinks: asLayer, insets: insets, autofill: autofill, sheetWindow: sheetWindow)
+            .onAppear { record(report.map { [$0] } ?? []) }
+            .onChange(of: report) { record($0.map { [$0] } ?? []) }
     }
 
     // MARK: Reports
@@ -303,27 +328,17 @@ public struct HotlayoutScreen: View {
         for report in reports { sink.add(report.kind, report.location, report.reason) }
     }
 
-    private func observeReports() {
-        guard let onReport else {
-            sink.observe(nil)
-            return
-        }
-        let sink = self.sink
-        sink.observe { Self.deliver(sink, to: onReport) }
-    }
-
-    private static func deliver(_ sink: ReportSink, to onReport: @escaping ([HotlayoutReport]) -> Void) {
-        DispatchQueue.main.async {
-            let fresh = sink.drain()
-            if !fresh.isEmpty { onReport(fresh) }
-        }
-    }
-
     /// Hands the reports that appeared since the last time to the host, after the frame that made
     /// them was drawn (a report of drawing is added while SwiftUI evaluates the body).
     private func deliverReports() {
+        let added = reportsAdded
+        DispatchQueue.main.async { added.send() }
+    }
+
+    private func handOverReports() {
         guard let onReport else { return }
-        Self.deliver(sink, to: onReport)
+        let fresh = sink.drain()
+        if !fresh.isEmpty { onReport(fresh) }
     }
 
     // MARK: Presses
@@ -366,7 +381,34 @@ public struct HotlayoutScreen: View {
         return PressRun(runner: .reader, task: nil)
     }
 
-    private func perform(_ action: JSONObject, node: DocumentNode, instances: [ListInstance] = [], animated: Bool = true) -> PressRun {
+    /// Closes the modal layer on top without a press: a tap on the scrim or a drag that closes a
+    /// sheet. The host is asked first, as for `navigate.back`; the source names no node of the document.
+    private func dismissLayer(animated: Bool) {
+        var updated = currentFlow
+        let screenId = updated.top?.screenId ?? ""
+        let source = ActionSource(nodeId: ActionSource.layerDismissal, screenId: screenId, record: updated.nodeRecord(instances: []))
+        let shown = updated.dismissLayer { kind, from, to, action in
+            onNavigate?(NavigationEvent(kind: kind, from: from, to: to, action: action, source: source)) ?? true
+        }
+        guard let shown else { return }
+        show(updated, animated: animated)
+        onScreenChange?(shown)
+        deliverReports()
+    }
+
+    /// Puts a new stack on the screen, with the motion of a screen change unless `animated` is false.
+    private func show(_ updated: Flow, animated: Bool) {
+        carousels.prune(frames: updated.stack.map(\.screenId))
+        if animated {
+            withAnimation(.easeOut(duration: 0.22)) { self.flow = updated }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { self.flow = updated }
+        }
+    }
+
+    private func perform(_ action: JSONObject, node: DocumentNode, instances: [ListInstance] = []) -> PressRun {
         if WriteActions.isWriteType(action["type"]?.stringValue) {
             return performWrite(action, node: node, instances: instances)
         }
@@ -383,16 +425,7 @@ public struct HotlayoutScreen: View {
             }
         )
         let task = PressDelivery.hand(outcome, source: source, onAction: { handOver($0, $1) })
-        if updated != before {
-            carousels.prune(frames: updated.stack.map(\.screenId))
-            if animated {
-                withAnimation(.easeOut(duration: 0.22)) { self.flow = updated }
-            } else {
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) { self.flow = updated }
-            }
-        }
+        if updated != before { show(updated, animated: true) }
         if let shown = outcome.shown { onScreenChange?(shown) }
         deliverReports()
         return PressRun(runner: SwipeConfirmRules.runner(type: action["type"]?.stringValue, outcome: outcome), task: task)

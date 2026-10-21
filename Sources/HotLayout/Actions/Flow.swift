@@ -300,3 +300,15 @@ struct Flow: Equatable, Sendable {
         return outcome
     }
 }
+
+extension Flow {
+    /// Closes the modal layer on top without a press (a tap on its scrim, a drag that closes a sheet):
+    /// asked of the host like `navigate.back`, then the top frame goes. Nothing on the first screen.
+    mutating func dismissLayer(allowNavigation: (NavigationEvent.Kind, String, String, HotlayoutAction) -> Bool) -> ScreenShownEvent? {
+        guard stack.count > 1 else { return nil }
+        let back = ActionCatalog.handed(["type": "navigate.back"], scope: [:])
+        guard allowNavigation(.back, stack[stack.count - 1].screenId, stack[stack.count - 2].screenId, back) else { return nil }
+        stack.removeLast()
+        return shownEvent(cause: .back)
+    }
+}
