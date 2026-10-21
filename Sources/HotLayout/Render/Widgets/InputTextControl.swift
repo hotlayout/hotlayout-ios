@@ -150,13 +150,14 @@ final class InputTextCoordinator: NSObject, UITextFieldDelegate, UITextViewDeleg
     var onChange: (InputControlChange) -> Void = { _ in }
     var tracker = CompositionTracker()
     var placeholderLabel: UILabel?
-    /// The focus the view last asked for: the native control is told only when the ask CHANGES, so a
-    /// change that began in the control is not fought over.
-    private var requestedFocus = false
+    /// The focus the view last asked for: the native control is told only when the ask CHANGES. A
+    /// change that began in the control (a tap, the system) does not move it, so an update drawn
+    /// before the view has heard of that change does not undo it.
+    private var askedFocus = false
 
     func applyFocus(_ focused: Bool, to view: UIView) {
-        guard focused != requestedFocus else { return }
-        requestedFocus = focused
+        guard focused != askedFocus else { return }
+        askedFocus = focused
         DispatchQueue.main.async {
             if focused, !view.isFirstResponder { view.becomeFirstResponder() }
             if !focused, view.isFirstResponder { view.resignFirstResponder() }
@@ -168,12 +169,10 @@ final class InputTextCoordinator: NSObject, UITextFieldDelegate, UITextViewDeleg
     }
 
     private func begin() {
-        requestedFocus = true
         onChange(.focus(true))
     }
 
     private func finish(text: String) {
-        requestedFocus = false
         let rest = tracker.ended(text: text)
         if !rest.isEmpty { onChange(.events(rest)) }
         onChange(.focus(false))

@@ -127,6 +127,27 @@ final class ScreenCompositionTests: XCTestCase {
         XCTAssertEqual(view.text, "か")
     }
 
+    /// A control the platform focused (a tap) keeps the focus through an update drawn before the screen has heard of
+    /// it: only a change of what the screen asks moves the focus. Otherwise the stale ask resigns the control, and an
+    /// open composition is committed and written character by character.
+    func testAFocusThePlatformGaveIsNotUndoneByAStaleAsk() throws {
+        let coordinator = InputTextCoordinator()
+        let view = UITextView(frame: CGRect(x: 0, y: 0, width: 200, height: 80))
+        view.delegate = coordinator
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+        window.addSubview(view)
+        window.makeKeyAndVisible()
+        coordinator.applyFocus(false, to: view)
+        XCTAssertTrue(view.becomeFirstResponder())
+        coordinator.applyFocus(false, to: view)
+        spin(0.2)
+        XCTAssertTrue(view.isFirstResponder, "the screen asked for no change")
+        coordinator.applyFocus(true, to: view)
+        coordinator.applyFocus(false, to: view)
+        spin(0.2)
+        XCTAssertFalse(view.isFirstResponder, "the screen asked the focus away")
+    }
+
     func testAValueThatArrivesBeforeTheFirstTouchIsNotWritten() throws {
         let recorder = Recorder()
         let window = host(try document(), recorder: recorder)
