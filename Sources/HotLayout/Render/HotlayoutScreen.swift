@@ -69,10 +69,12 @@ public struct HotlayoutScreen: View {
     @State private var sink = ReportSink()
     /// Fires on the main queue, after the frame, when there may be reports to hand over.
     @State private var reportsAdded = PassthroughSubject<Void, Never>()
+    /// The screen-shown events after the first one, handed to the newest `onScreenChange`.
+    @State private var screensShown = PassthroughSubject<ScreenShownEvent, Never>()
 
     /// - Parameters:
-    ///   - document: a document from `loadDocument`.
-    ///   - theme: the theme contract of the project (`loadTheme`); the built-in theme without one.
+    ///   - document: a document from `HotlayoutDocument.load(_:)`.
+    ///   - theme: the theme contract of the project (`HotlayoutThemeSet.load(_:)`); the built-in theme without one.
     ///   - themeId: a theme of the set to draw with; the set's default without one.
     ///   - data: the host's data, a flat map from a data path to a value.
     ///   - locale: the device locale as the platform gives it (`ar-EG`, `pt_BR`).
@@ -247,11 +249,12 @@ public struct HotlayoutScreen: View {
         }
         .onDisappear { sink.observe(nil) }
         // The action of `onReceive` is the one of the newest body (that of `onChange` is not), so the
-        // host's newest `onReport` hears every report.
+        // host's newest `onReport` hears every report and its newest `onScreenChange` every show.
         .onReceive(reportsAdded) { handOverReports() }
+        .onReceive(screensShown) { onScreenChange?($0) }
         .onChange(of: DrawnDocument(document: document)) { new in
             var updated = currentFlow
-            if let event = updated.update(document: FlowDocument(new.document)) { onScreenChange?(event) }
+            if let event = updated.update(document: FlowDocument(new.document)) { screensShown.send(event) }
             self.flow = updated
             record(new.document.reports)
             deliverReports()
@@ -266,7 +269,7 @@ public struct HotlayoutScreen: View {
         }
         .onChange(of: entry) { newEntry in
             var updated = currentFlow
-            if let event = updated.restart(entry: newEntry) { onScreenChange?(event) }
+            if let event = updated.restart(entry: newEntry) { screensShown.send(event) }
             self.flow = updated
             deliverReports()
         }
@@ -393,7 +396,7 @@ public struct HotlayoutScreen: View {
         }
         guard let shown else { return }
         show(updated, animated: animated)
-        onScreenChange?(shown)
+        screensShown.send(shown)
         deliverReports()
     }
 
@@ -427,7 +430,7 @@ public struct HotlayoutScreen: View {
         )
         let task = PressDelivery.hand(outcome, source: source, onAction: { handOver($0, $1) })
         if updated != before { show(updated, animated: true) }
-        if let shown = outcome.shown { onScreenChange?(shown) }
+        if let shown = outcome.shown { screensShown.send(shown) }
         deliverReports()
         return PressRun(runner: SwipeConfirmRules.runner(type: action["type"]?.stringValue, outcome: outcome), task: task)
     }

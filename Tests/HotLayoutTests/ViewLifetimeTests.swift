@@ -256,6 +256,47 @@ final class ViewLifetimeTests: XCTestCase {
         XCTAssertEqual(documents.shown, ["entry:a", "entry:b"])
     }
 
+    final class Shows: ObservableObject {
+        @Published var document: HotlayoutDocument
+        @Published var entry: String?
+        @Published var generation = 0
+        var heard: [(generation: Int, shown: String)] = []
+
+        init(_ document: HotlayoutDocument) { self.document = document }
+    }
+
+    /// A host whose handler of the screen-shown event changes with every update it makes.
+    private struct ShowHost: View {
+        @ObservedObject var shows: Shows
+
+        var body: some View {
+            let generation = shows.generation
+            HotlayoutScreen(
+                document: shows.document, locale: "en", entry: shows.entry,
+                onScreenChange: { [shows] in shows.heard.append((generation, "\($0.cause):\($0.screenId)")) })
+        }
+    }
+
+    func testAShowAfterAnUpdateReachesTheNewestHandler() throws {
+        func document(_ ids: [String]) throws -> HotlayoutDocument {
+            try HotlayoutDocument.load([
+                "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": .string(ids[0]), "entryPoints": ["late": .string(ids.last ?? "")],
+                "screens": .array(ids.map { ["screenId": .string($0), "name": .string($0), "root": ["id": .string("r-\($0)"), "type": "Screen", "props": [:], "children": []]] }),
+            ])
+        }
+        let shows = Shows(try document(["a"]))
+        let held = showScreen(ShowHost(shows: shows), wait: 0.4)
+        shows.generation = 1
+        shows.document = try document(["b", "c"])
+        runLoop(0.3)
+        shows.generation = 2
+        shows.entry = "late"
+        runLoop(0.3)
+        withExtendedLifetime(held) {}
+        XCTAssertEqual(shows.heard.map(\.shown), ["entry:a", "entry:b", "entry:c"])
+        XCTAssertEqual(shows.heard.map(\.generation), [0, 1, 2], "each show reaches the handler of the update that made it")
+    }
+
     // MARK: Pictures
 
     func testAFailedPictureIsAskedForAgainAfterItsLifetime() async throws {
