@@ -11,6 +11,7 @@ import SwiftUI
 ///   -screen <screenId>   with -app: the screen the app opens on
 ///   -entry <name>   a named entry point of the app   -scenario <name>   -tab <name>   data of Orbit
 ///   -contractSamples YES   the samples of the data dictionary and a fixed clock
+///   -clock running         with -contractSamples: the clock starts at the samples' moment and runs
 ///   -showActions YES       what reached the host, as text the UI tests read
 ///   -fontReport YES        whether the theme's body family is installed
 ///   -landscape YES         the window turned to the side
@@ -132,30 +133,13 @@ struct FixtureScreen: View {
     @State private var lastAction = ""
     /// `-showActions YES`: what reached the host, counted, as text the UI tests can read.
     @State private var actionLog: [String] = []
+    @State private var clockStart = Date()
     private var showActions: Bool { UserDefaults.standard.bool(forKey: "showActions") }
 
     var body: some View {
         switch Result(catching: { try Fixtures.document(name, screenId: screenId) }) {
         case .success(let document):
-            HotlayoutScreen(
-                document: document,
-                theme: Fixtures.theme(name),
-                data: SampleData.chosen(for: name),
-                locale: locale ?? Locale.current.identifier,
-                now: SampleData.now,
-                images: SampleImages.policy,
-                onAction: { action, _ in
-                    lastAction = action.type
-                    let verdict = action.standard != nil ? "standard" : (action.invalid.map { "invalid:\($0.param)" } ?? "other")
-                    actionLog.append("\(action.type)|\(verdict)")
-                },
-                onTrack: { event, _ in actionLog.append("track:\(event.event)") },
-                onScreenChange: { event in
-                    print("shown", event.screenId, event.cause.rawValue)
-                    actionLog.append("shown:\(event.screenId):\(event.cause.rawValue)")
-                },
-                onReport: { reports in reports.forEach { print("report", $0) } }
-            )
+            clocked(document)
             .overlay(alignment: .topLeading) {
                 if showActions {
                     Text("actions=\(actionLog.count) " + actionLog.joined(separator: ","))
@@ -181,6 +165,42 @@ struct FixtureScreen: View {
         case .failure(let error):
             Text("Could not open \(name): \(String(describing: error))").padding()
         }
+    }
+
+    /// `-clock running` (with `-contractSamples`): the host's clock starts at the moment of the samples
+    /// and goes on a whole second at a time, as the prototype of the editor runs it. The reader does not
+    /// tick under a moment the host gives; the host that owns the clock moves it.
+    @ViewBuilder
+    private func clocked(_ document: HotlayoutDocument) -> some View {
+        if UserDefaults.standard.string(forKey: "clock") == "running", let samples = SampleData.now {
+            TimelineView(.periodic(from: clockStart, by: 1)) { timeline in
+                reader(document, now: samples.addingTimeInterval(timeline.date.timeIntervalSince(clockStart).rounded(.down)))
+            }
+        } else {
+            reader(document, now: SampleData.now)
+        }
+    }
+
+    private func reader(_ document: HotlayoutDocument, now: Date?) -> HotlayoutScreen {
+        HotlayoutScreen(
+            document: document,
+            theme: Fixtures.theme(name),
+            data: SampleData.chosen(for: name),
+            locale: locale ?? Locale.current.identifier,
+            now: now,
+            images: SampleImages.policy,
+            onAction: { action, _ in
+                lastAction = action.type
+                let verdict = action.standard != nil ? "standard" : (action.invalid.map { "invalid:\($0.param)" } ?? "other")
+                actionLog.append("\(action.type)|\(verdict)")
+            },
+            onTrack: { event, _ in actionLog.append("track:\(event.event)") },
+            onScreenChange: { event in
+                print("shown", event.screenId, event.cause.rawValue)
+                actionLog.append("shown:\(event.screenId):\(event.cause.rawValue)")
+            },
+            onReport: { reports in reports.forEach { print("report", $0) } }
+        )
     }
 }
 

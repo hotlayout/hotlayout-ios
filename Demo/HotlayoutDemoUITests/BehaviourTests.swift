@@ -240,18 +240,33 @@ final class BehaviourTests: XCTestCase {
 
     // MARK: - Countdown
 
-    /// A text of `countdownPart` bindings ticks once a second on the ready screen.
-    func testCountdownTextTicksEverySecond() {
-        let app = launchFixture("value-countdown-screens", screen: "balance")
+    /// The label of the countdown and how it reads over the next seconds.
+    private func countdownLabels(clock: String?) -> (first: String, later: [String], app: XCUIApplication) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-fixture", "value-countdown-screens", "-screen", "balance", "-locale", "en", "-contractSamples", "YES"]
+            + (clock.map { ["-clock", $0] } ?? [])
+        app.launch()
         let label = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Ends in'")).firstMatch
         XCTAssertTrue(label.waitForExistence(timeout: 5), "the countdown is on the screen")
         let first = label.label
-        var changed = false
-        for _ in 0..<6 {
+        var later: [String] = []
+        for _ in 0..<3 {
             sleep(1)
-            if label.label != first { changed = true; break }
+            later.append(label.label)
         }
-        XCTAssertTrue(changed, "the seconds went down: \(first) → \(label.label)")
-        attachScreenshot(app, "countdown")
+        return (first, later, app)
+    }
+
+    /// A host that runs its clock from the moment of the samples: the countdown goes down once a second.
+    func testCountdownTextTicksEverySecond() {
+        let shown = countdownLabels(clock: "running")
+        XCTAssertTrue(shown.later.contains { $0 != shown.first }, "the seconds went down: \(shown.first) → \(shown.later)")
+        attachScreenshot(shown.app, "countdown")
+    }
+
+    /// A host that gives a fixed moment owns the clock: the countdown stands at the time left from it.
+    func testCountdownStandsUnderTheHostsFixedMoment() {
+        let shown = countdownLabels(clock: nil)
+        XCTAssertEqual(shown.later, Array(repeating: shown.first, count: 3), "nothing ticks under the host's moment")
     }
 }
