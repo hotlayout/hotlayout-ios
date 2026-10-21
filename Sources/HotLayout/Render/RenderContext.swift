@@ -255,6 +255,11 @@ struct PressRun {
 /// followed); a target it refuses is not followed. Pictures are fetched with a private session that
 /// has no cookie storage, no shared cache, no credentials of the host app and no `Referer`, and
 /// one picture, redirects included, has 30 seconds.
+///
+/// Pictures are kept in one memory cache for the whole app, by address and decoded size: two
+/// screens that show the same address at the same `maxPixelSide` share one download. An address
+/// remembers the policy that resolved it last; its redirects and its byte limit follow that one.
+/// An address that failed is asked for again after a minute, or when the app becomes active.
 public struct ImagePolicy: Sendable {
     /// The default for `maxDownloadBytes`: 10 MiB (10 485 760 bytes) for one picture.
     public static let defaultMaxDownloadBytes = 10 * 1024 * 1024
