@@ -48,7 +48,7 @@ final class TextTransitionWiringTests: XCTestCase {
         var context = Body.context(scope: ["p": 5000])
         context.now = 0
         // The node has shown 1000 before, then the data changes to 5000.
-        let engine = ValueTransitionEngine()
+        var engine = ValueTransitionEngine()
         let key = "\(context.locale.translation ?? "")|\(context.locale.formatting ?? "")"
         engine.sync(targets: ValueTransition.targets(node.props), read: { _ in .number(1000) }, leads: true, localeKey: key, reducedMotion: false)
         engine.sync(targets: ValueTransition.targets(node.props), read: { _ in .number(5000) }, leads: true, localeKey: key, reducedMotion: false)

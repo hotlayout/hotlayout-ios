@@ -7,7 +7,10 @@ import SwiftUI
 /// Two scopes come out: `stepped` for the label (the number moves in steps) and `smooth` for
 /// the fill of a scale (no step). A change during a transition starts from the value shown at
 /// that moment and runs the full duration.
-final class ValueTransitionEngine {
+///
+/// A value: the view keeps the engine it has committed and draws each frame from a copy brought
+/// up to the data and the moment of that frame.
+struct ValueTransitionEngine {
     struct Run {
         var from: Double
         var to: Double
@@ -45,7 +48,7 @@ final class ValueTransitionEngine {
     private var justFinished = false
 
     /// True once after the last run ended.
-    func takeFinished() -> Bool {
+    mutating func takeFinished() -> Bool {
         defer { justFinished = false }
         return justFinished
     }
@@ -57,7 +60,7 @@ final class ValueTransitionEngine {
     }
 
     /// The appearance: every number of the node starts from zero at the moment it is shown.
-    func appear(targets: [ValueTransition.Target], read: (String) -> JSONValue?, reducedMotion: Bool) {
+    mutating func appear(targets: [ValueTransition.Target], read: (String) -> JSONValue?, reducedMotion: Bool) {
         for target in targets {
             let raw = read(target.path)
             last[target.path] = raw ?? .null
@@ -71,7 +74,7 @@ final class ValueTransitionEngine {
     }
 
     /// Reads the data of this render. The first render of a node is its first show: no transition.
-    func sync(targets: [ValueTransition.Target], read: (String) -> JSONValue?, leads: Bool, localeKey: String, reducedMotion: Bool) {
+    mutating func sync(targets: [ValueTransition.Target], read: (String) -> JSONValue?, leads: Bool, localeKey: String, reducedMotion: Bool) {
         let first = !mounted
         let localeChanged = !first && localeKey != self.localeKey
         mounted = true
@@ -109,7 +112,7 @@ final class ValueTransitionEngine {
 
     /// A frame at `milliseconds`: the first frame of a run fixes its start, a run past the
     /// duration ends.
-    func tick(_ milliseconds: Double) {
+    mutating func tick(_ milliseconds: Double) {
         time = milliseconds
         let was = !runs.isEmpty
         defer { if was, runs.isEmpty { justFinished = true } }
@@ -121,6 +124,18 @@ final class ValueTransitionEngine {
                 runs[path] = run
             }
         }
+    }
+
+    /// The moment the last run in progress ends; `nil` when none runs or a run has not had its first frame.
+    var endsAt: Double? {
+        let ends = runs.values.map { $0.start.map { $0 + ValueTransition.durationMs } }
+        guard !ends.isEmpty, !ends.contains(where: { $0 == nil }) else { return nil }
+        return ends.compactMap { $0 }.max()
+    }
+
+    /// Every run starts again at its first frame (the tests' fixed moment counts from there).
+    mutating func rewind() {
+        for path in runs.keys { runs[path]?.start = nil }
     }
 
     func shown(_ scope: DataScope) -> Shown {
@@ -156,14 +171,19 @@ extension EnvironmentValues {
 
 /// Hosts a node that may lead its numbers: without `animateChanges` and `animateIn` the content
 /// gets the data untouched; with them it is redrawn on every frame of the runs in progress.
+///
+/// Each frame is drawn from a copy of the committed engine brought up to the data of this update
+/// and the moment of the frame, so the frame that brings a change already shows its start. The
+/// engine itself changes only after the update: when the node appears, when its data change and
+/// when the last run ends.
 struct ValueTransitioned<Content: View>: View {
     let node: DocumentNode
     let context: RenderContext
     let content: (ValueTransitionEngine.Shown) -> Content
 
     @State private var engine: ValueTransitionEngine
-    @State private var finishes = 0
     @Environment(\.valueTransitionElapsedMs) private var fixedElapsed
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// `engine` lets a test hand in an engine that has already read the data before.
     init(node: DocumentNode, context: RenderContext, engine: ValueTransitionEngine? = nil, content: @escaping (ValueTransitionEngine.Shown) -> Content) {
@@ -172,7 +192,20 @@ struct ValueTransitioned<Content: View>: View {
         self.content = content
         _engine = State(initialValue: engine ?? ValueTransitionEngine())
     }
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Everything the engine reads from one update. The commit after an update works from this
+    /// value alone: the action of `onChange` sees the view as it was before the update.
+    private struct Inputs: Equatable {
+        var leads: Bool
+        var appears: Bool
+        var targets: [ValueTransition.Target]
+        var appearTargets: [ValueTransition.Target]
+        var values: [String: JSONValue]
+        var localeKey: String
+        var reducedMotion: Bool
+
+        func read(_ path: String) -> JSONValue? { values[path] }
+    }
 
     var body: some View {
         let leads = ValueTransition.animatesChanges(node.props)
@@ -180,44 +213,72 @@ struct ValueTransitioned<Content: View>: View {
         if !leads && !appears {
             content(.plain(context.scope))
         } else {
-            let _ = update(leads: leads, appears: appears)
-            let _ = finishes
-            TimelineView(.animation(paused: !engine.isRunning)) { timeline in
-                let _ = tick(timeline.date)
-                let _ = pauseWhenFinished()
-                content(engine.shown(context.scope))
+            let inputs = inputs(leads: leads, appears: appears)
+            TimelineView(.animation(paused: !frame(inputs, at: Date()).isRunning)) { timeline in
+                content(frame(inputs, at: timeline.date).shown(context.scope))
             }
+            .onAppear { commit(inputs) }
+            .onChange(of: inputs) { commit($0) }
+            .task(id: engine.endsAt) { await finishRuns() }
         }
     }
 
-    private func tick(_ date: Date) {
+    private func inputs(leads: Bool, appears: Bool) -> Inputs {
+        let appearTargets = ValueTransition.appearTargets(node.props)
+        let targets = leads ? ValueTransition.targets(node.props) : appearTargets
+        let literal = node.props["value"]?["kind"]?.stringValue == "literal" ? node.props["value"]?["value"] : nil
+        var values: [String: JSONValue] = [:]
+        for path in Set((targets + appearTargets).map(\.path)) {
+            // A literal `value` of a scale stands under its own key.
+            let value = path == ValueTransition.literalKey ? literal : context.scope[path]
+            if let value, !value.isNull { values[path] = value }
+        }
+        return Inputs(
+            leads: leads, appears: appears, targets: targets, appearTargets: appearTargets, values: values,
+            localeKey: "\(context.locale.translation ?? "")|\(context.locale.formatting ?? "")", reducedMotion: reduceMotion)
+    }
+
+    /// The committed engine brought up to the data of an update.
+    private func synced(_ inputs: Inputs) -> ValueTransitionEngine {
+        var next = engine
+        if inputs.appears, !next.mounted {
+            next.appear(targets: inputs.appearTargets, read: inputs.read, reducedMotion: inputs.reducedMotion)
+        }
+        next.sync(targets: inputs.targets, read: inputs.read, leads: inputs.leads, localeKey: inputs.localeKey, reducedMotion: inputs.reducedMotion)
+        return next
+    }
+
+    /// The engine as the frame at `date` sees it; nothing is stored.
+    private func frame(_ inputs: Inputs, at date: Date) -> ValueTransitionEngine {
+        var shown = synced(inputs)
         if let fixedElapsed {
             // The first frame fixes the start of a run; the second is the chosen moment.
-            engine.tick(0)
-            engine.tick(fixedElapsed)
+            shown.rewind()
+            shown.tick(0)
+            shown.tick(fixedElapsed)
         } else {
-            engine.tick(date.timeIntervalSinceReferenceDate * 1000)
+            shown.tick(Self.milliseconds(date))
         }
+        return shown
     }
 
-    /// The timeline pauses only when the node is drawn again, so the end of the last run asks for it.
-    private func pauseWhenFinished() {
-        guard engine.takeFinished() else { return }
-        DispatchQueue.main.async { finishes += 1 }
+    /// Keeps what the frames have read: the data seen and the start of every new run.
+    private func commit(_ inputs: Inputs) {
+        var next = synced(inputs)
+        next.tick(Self.milliseconds(Date()))
+        engine = next
     }
 
-    private func update(leads: Bool, appears: Bool) {
-        let scope = context.scope
-        let literal = node.props["value"]?["kind"]?.stringValue == "literal" ? node.props["value"]?["value"] : nil
-        let read: (String) -> JSONValue? = { path in
-            let value = path == ValueTransition.literalKey ? literal : scope[path]
-            return value?.isNull == true ? nil : value
-        }
-        if appears, !engine.mounted {
-            engine.appear(targets: ValueTransition.appearTargets(node.props), read: read, reducedMotion: reduceMotion)
-        }
-        let targets = leads ? ValueTransition.targets(node.props) : ValueTransition.appearTargets(node.props)
-        let key = "\(context.locale.translation ?? "")|\(context.locale.formatting ?? "")"
-        engine.sync(targets: targets, read: read, leads: leads, localeKey: key, reducedMotion: reduceMotion)
+    /// Waits for the end of the last run and lets it go, so that the timeline pauses.
+    private func finishRuns() async {
+        guard let end = engine.endsAt else { return }
+        let wait = max(0, end - Self.milliseconds(Date()))
+        try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000))
+        guard !Task.isCancelled else { return }
+        var next = engine
+        next.tick(max(end, Self.milliseconds(Date())))
+        engine = next
     }
+
+    private static func milliseconds(_ date: Date) -> Double { date.timeIntervalSinceReferenceDate * 1000 }
 }
