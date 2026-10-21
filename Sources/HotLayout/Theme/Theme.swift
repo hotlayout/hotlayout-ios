@@ -169,32 +169,41 @@ public struct HotlayoutThemeSet: Equatable, Sendable {
     }
 }
 
-/// Loads a theme contract (`theme/published.json` of a project): JSON, the version gate, then a
-/// tolerant read of every theme. A token of the wrong shape is skipped and listed in `reports`
-/// of the result; the built-in theme of the same brightness fills what is missing.
-///
-/// - Throws: `HotlayoutLoadError.malformedJSON` for text that is not JSON, and
-///   `HotlayoutLoadError.notATheme` for JSON that is not a readable theme contract (no `themes`,
-///   a major version this reader does not read, or no theme that can be read). Draw with
-///   `HotlayoutThemeSet.builtIn` instead.
-public func loadTheme(_ data: Data) throws -> HotlayoutThemeSet {
-    let json: JSONValue
-    do {
-        json = try JSONValue.parse(data)
-    } catch {
-        throw HotlayoutLoadError.malformedJSON(String(describing: error))
+extension HotlayoutThemeSet {
+    /// Loads a theme contract (`theme/published.json` of a project): JSON, the version gate, then a
+    /// tolerant read of every theme. A token of the wrong shape is skipped and listed in `reports`
+    /// of the result; the built-in theme of the same brightness fills what is missing.
+    ///
+    /// - Throws: `HotlayoutLoadError.malformedJSON` for text that is not JSON, and
+    ///   `HotlayoutLoadError.notATheme` for JSON that is not a readable theme contract (no `themes`,
+    ///   a major version this reader does not read, or no theme that can be read). Draw with
+    ///   `HotlayoutThemeSet.builtIn` instead.
+    public static func load(_ data: Data) throws -> HotlayoutThemeSet {
+        let json: JSONValue
+        do {
+            json = try JSONValue.parse(data)
+        } catch {
+            throw HotlayoutLoadError.malformedJSON(String(describing: error))
+        }
+        return try load(json)
     }
-    return try loadTheme(json)
+
+    /// Loads a theme contract from JSON that is already parsed.
+    public static func load(_ json: JSONValue) throws -> HotlayoutThemeSet {
+        let sink = ReportSink()
+        guard var set = HotlayoutThemeSet.read(json, sink: sink) else {
+            throw HotlayoutLoadError.notATheme(sink.reports.first?.reason ?? "no theme can be read")
+        }
+        set.reports = sink.reports
+        return set
+    }
 }
 
-public func loadTheme(_ json: JSONValue) throws -> HotlayoutThemeSet {
-    let sink = ReportSink()
-    guard var set = HotlayoutThemeSet.read(json, sink: sink) else {
-        throw HotlayoutLoadError.notATheme(sink.reports.first?.reason ?? "no theme can be read")
-    }
-    set.reports = sink.reports
-    return set
-}
+@available(*, deprecated, renamed: "HotlayoutThemeSet.load(_:)")
+public func loadTheme(_ data: Data) throws -> HotlayoutThemeSet { try HotlayoutThemeSet.load(data) }
+
+@available(*, deprecated, renamed: "HotlayoutThemeSet.load(_:)")
+public func loadTheme(_ json: JSONValue) throws -> HotlayoutThemeSet { try HotlayoutThemeSet.load(json) }
 
 enum ThemeReader {
     static func read(_ json: JSONValue, base: HotlayoutThemeSet?, sink: ReportSink) -> HotlayoutThemeSet? {
@@ -203,7 +212,7 @@ enum ThemeReader {
             return nil
         }
         if let version = object["themeContractVersion"]?.stringValue {
-            let verdict = checkVersion(version, readerVersion: HotlayoutVersions.theme)
+            let verdict = HotlayoutVersions.check(version, readerVersion: HotlayoutVersions.theme)
             guard verdict.isReadable else {
                 sink.add(.ignoredInput, "theme", "theme contract \(version) is not readable by this reader; the built-in theme is used")
                 return nil

@@ -18,10 +18,10 @@ enum Localization {
     /// available only if its table holds at least one string; a partly translated language
     /// is shown, and the rest falls back to the source text.
     static func resolve(_ localization: DocumentLocalization?, requested: String?) -> LocaleResolution {
-        guard let localization else { return resolveLocale(requested, available: [], source: nil) }
+        guard let localization else { return LocaleResolution.resolve(requested, available: [], source: nil) }
         let available = localization.locales.filter { locale in
             locale == localization.defaultLocale || !(localization.strings[locale]?.isEmpty ?? true)
         }
-        return resolveLocale(requested, available: available, source: localization.defaultLocale)
+        return LocaleResolution.resolve(requested, available: available, source: localization.defaultLocale)
     }
 }

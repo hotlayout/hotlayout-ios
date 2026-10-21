@@ -100,41 +100,48 @@ func matches(_ expression: NSRegularExpression, _ text: String) -> Bool {
     return match.range == whole
 }
 
-/// Which language a document is shown in when the host asks for `requested`.
-///
-/// - Parameters:
-///   - requested: the locale of the user, as the platform gives it.
-///   - available: the document's `localization.locales`.
-///   - source: the document's `localization.defaultLocale`; `nil` — no localization.
-public func resolveLocale(_ requested: String?, available: [String], source: String?) -> LocaleResolution {
-    let asked = LocaleTags.normalize(requested)
-    let askedFormat = LocaleTags.wellFormedTag(asked)
+extension LocaleResolution {
+    /// Which language a document is shown in when the host asks for `requested`.
+    ///
+    /// - Parameters:
+    ///   - requested: the locale of the user, as the platform gives it.
+    ///   - available: the document's `localization.locales`.
+    ///   - source: the document's `localization.defaultLocale`; `nil` — no localization.
+    public static func resolve(_ requested: String?, available: [String], source: String?) -> LocaleResolution {
+        let asked = LocaleTags.normalize(requested)
+        let askedFormat = LocaleTags.wellFormedTag(asked)
 
-    guard let source else {
-        return LocaleResolution(translation: nil, formatting: askedFormat, directionLocale: askedFormat ?? asked, matched: false)
-    }
-    func canonical(_ locale: String) -> String { LocaleTags.normalize(locale) ?? locale }
-    let unmatched = LocaleResolution(
-        translation: source,
-        formatting: LocaleTags.wellFormedTag(LocaleTags.normalize(source)) ?? canonical(source),
-        directionLocale: canonical(source),
-        matched: false
-    )
-    guard let asked else { return unmatched }
-
-    // Comparison key → the DOCUMENT's spelling; the first in the list wins over a case twin.
-    var keys: [String: String] = [:]
-    for locale in available + [source] {
-        if let key = LocaleTags.normalize(locale)?.lowercased(), keys[key] == nil { keys[key] = locale }
-    }
-    for candidate in LocaleTags.lookupChain(asked) {
-        if let found = keys[candidate.lowercased()] {
-            let shown = canonical(found)
-            return LocaleResolution(
-                translation: found, formatting: askedFormat ?? LocaleTags.wellFormedTag(shown) ?? shown, directionLocale: shown, matched: true)
+        guard let source else {
+            return LocaleResolution(translation: nil, formatting: askedFormat, directionLocale: askedFormat ?? asked, matched: false)
         }
+        func canonical(_ locale: String) -> String { LocaleTags.normalize(locale) ?? locale }
+        let unmatched = LocaleResolution(
+            translation: source,
+            formatting: LocaleTags.wellFormedTag(LocaleTags.normalize(source)) ?? canonical(source),
+            directionLocale: canonical(source),
+            matched: false
+        )
+        guard let asked else { return unmatched }
+
+        // Comparison key → the DOCUMENT's spelling; the first in the list wins over a case twin.
+        var keys: [String: String] = [:]
+        for locale in available + [source] {
+            if let key = LocaleTags.normalize(locale)?.lowercased(), keys[key] == nil { keys[key] = locale }
+        }
+        for candidate in LocaleTags.lookupChain(asked) {
+            if let found = keys[candidate.lowercased()] {
+                let shown = canonical(found)
+                return LocaleResolution(
+                    translation: found, formatting: askedFormat ?? LocaleTags.wellFormedTag(shown) ?? shown, directionLocale: shown, matched: true)
+            }
+        }
+        return unmatched
     }
-    return unmatched
+}
+
+@available(*, deprecated, renamed: "LocaleResolution.resolve(_:available:source:)")
+public func resolveLocale(_ requested: String?, available: [String], source: String?) -> LocaleResolution {
+    LocaleResolution.resolve(requested, available: available, source: source)
 }
 
 /// Writing direction of a language from platform locale data (CLDR), not from a list of our

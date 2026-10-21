@@ -11,6 +11,35 @@ public enum HotlayoutVersions {
     public static let theme = "4.0.1"
     /// Icon set (`iconSetVersion` of `icons.json`).
     public static let iconSet = "1.0.0"
+
+    /// Compares a document version with the version this reader supports.
+    public static func check(_ documentVersion: String, readerVersion: String = HotlayoutVersions.schema) -> VersionVerdict {
+        guard let document = Semver(documentVersion) else {
+            return .incompatible(reason: "“\(documentVersion)” is not a version (expected major.minor.patch)", relation: .notAVersion)
+        }
+        guard let reader = Semver(readerVersion) else {
+            preconditionFailure("HotLayout: malformed reader version \(readerVersion)")
+        }
+        if document.major != reader.major {
+            return .incompatible(
+                reason: "major \(document.major) is not readable by a major-\(reader.major) reader",
+                relation: document.major > reader.major ? .documentNewer : .documentOlder
+            )
+        }
+        // Versions are compared as numbers: 9.10.0 is newer than 9.9.0.
+        if document.minor > reader.minor { return .newerMinor(documentVersion: documentVersion) }
+        return .compatible
+    }
+
+    /// The version gate for a whole document: reads `schemaVersion` and judges it.
+    ///
+    /// A document without a string version is "not a version", never "assume the latest".
+    public static func checkDocument(_ document: JSONValue) -> VersionVerdict {
+        guard let version = document["schemaVersion"]?.stringValue else {
+            return .incompatible(reason: "the document has no schemaVersion string", relation: .notAVersion)
+        }
+        return check(version)
+    }
 }
 
 /// The relation of an incompatible document to this reader.
@@ -56,31 +85,12 @@ private struct Semver {
     }
 }
 
-/// Compares a document version with the version this reader supports.
+@available(*, deprecated, renamed: "HotlayoutVersions.check(_:readerVersion:)")
 public func checkVersion(_ documentVersion: String, readerVersion: String = HotlayoutVersions.schema) -> VersionVerdict {
-    guard let document = Semver(documentVersion) else {
-        return .incompatible(reason: "“\(documentVersion)” is not a version (expected major.minor.patch)", relation: .notAVersion)
-    }
-    guard let reader = Semver(readerVersion) else {
-        preconditionFailure("HotLayout: malformed reader version \(readerVersion)")
-    }
-    if document.major != reader.major {
-        return .incompatible(
-            reason: "major \(document.major) is not readable by a major-\(reader.major) reader",
-            relation: document.major > reader.major ? .documentNewer : .documentOlder
-        )
-    }
-    // Versions are compared as numbers: 9.10.0 is newer than 9.9.0.
-    if document.minor > reader.minor { return .newerMinor(documentVersion: documentVersion) }
-    return .compatible
+    HotlayoutVersions.check(documentVersion, readerVersion: readerVersion)
 }
 
-/// The version gate for a whole document: reads `schemaVersion` and judges it.
-///
-/// A document without a string version is "not a version", never "assume the latest".
+@available(*, deprecated, renamed: "HotlayoutVersions.checkDocument(_:)")
 public func checkDocumentVersion(_ document: JSONValue) -> VersionVerdict {
-    guard let version = document["schemaVersion"]?.stringValue else {
-        return .incompatible(reason: "the document has no schemaVersion string", relation: .notAVersion)
-    }
-    return checkVersion(version)
+    HotlayoutVersions.checkDocument(document)
 }

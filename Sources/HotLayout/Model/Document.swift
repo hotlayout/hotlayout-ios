@@ -107,20 +107,31 @@ public enum HotlayoutLoadError: Error, Equatable, CustomStringConvertible, Senda
     }
 }
 
-/// Loads a document: JSON, the version gate, the guards, then a tolerant read of the tree.
-public func loadDocument(_ data: Data) throws -> HotlayoutDocument {
-    let json: JSONValue
-    do {
-        json = try JSONValue.parse(data)
-    } catch {
-        throw HotlayoutLoadError.malformedJSON(String(describing: error))
+extension HotlayoutDocument {
+    /// Loads a document: JSON, the version gate, the guards, then a tolerant read of the tree.
+    ///
+    /// - Throws: `HotlayoutLoadError`.
+    public static func load(_ data: Data) throws -> HotlayoutDocument {
+        let json: JSONValue
+        do {
+            json = try JSONValue.parse(data)
+        } catch {
+            throw HotlayoutLoadError.malformedJSON(String(describing: error))
+        }
+        return try load(json)
     }
-    return try loadDocument(json)
+
+    /// Loads a document from JSON that is already parsed.
+    public static func load(_ json: JSONValue) throws -> HotlayoutDocument {
+        try DocumentReader.read(json)
+    }
 }
 
-public func loadDocument(_ json: JSONValue) throws -> HotlayoutDocument {
-    try DocumentReader.read(json)
-}
+@available(*, deprecated, renamed: "HotlayoutDocument.load(_:)")
+public func loadDocument(_ data: Data) throws -> HotlayoutDocument { try HotlayoutDocument.load(data) }
+
+@available(*, deprecated, renamed: "HotlayoutDocument.load(_:)")
+public func loadDocument(_ json: JSONValue) throws -> HotlayoutDocument { try HotlayoutDocument.load(json) }
 
 /// The tolerant reader of the document tree.
 enum DocumentReader {
@@ -141,7 +152,7 @@ enum DocumentReader {
         let json = withoutForbiddenKeys(raw)
         guard let object = json.objectValue else { throw HotlayoutLoadError.notADocument("the document is not an object") }
 
-        let verdict = checkDocumentVersion(json)
+        let verdict = HotlayoutVersions.checkDocument(json)
         guard verdict.isReadable else { throw HotlayoutLoadError.incompatibleVersion(verdict) }
 
         let sink = ReportSink()
