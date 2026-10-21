@@ -429,7 +429,7 @@ final class ScreenAnatomyCasesTests: XCTestCase {
             "safeTopValueCases", "scrolledThresholdCases", "scrolledLayerCases", "screenTopRuleCases", "appBar916RuleCases", "shownCases",
             // The picture groups run in ImageCasesTests.
             "ratioCases", "imageBoxCases", "paintCases", "radiusCases", "circleCases",
-            // The own glyph size runs in LayoutFixTests.
+            // The own glyph size runs in LayoutAndPaintTests.
             "glyphCases",
         ]
         let chromeNotRun: [String: String] = [

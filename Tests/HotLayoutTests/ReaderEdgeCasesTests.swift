@@ -4,9 +4,9 @@ import XCTest
 
 /// The tables of schema 9.28.0 that are rules as functions: the address of a picture, the list
 /// budget, the numbers of a theme and the paint of a text. The same rules through the real screen
-/// are in `Contract928WiringTests`.
+/// are in `ReaderEdgeScreenWiringTests` and `ImageLoadingWiringTests`.
 @MainActor
-final class Contract928CasesTests: XCTestCase {
+final class ReaderEdgeCasesTests: XCTestCase {
     static let images = try! Contract.json("fixtures/image-source/image-source-cases.json")
     static let budget = try! Contract.json("fixtures/repeater-filter/list-budget-cases.json")
     static let numbers = try! Contract.json("fixtures/theme-numbers/theme-number-cases.json")

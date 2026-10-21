@@ -60,7 +60,6 @@ enum ShowcaseApp: String, CaseIterable, Identifiable {
     /// The pictures of the apps live on the site: an address of Obsidian and Sunny names a path of it.
     /// This is the host's decision; the reader's own rule (https only) is left as it is.
     static let images = ImagePolicy(resolve: { address in
-        NSLog("resolve %@", address)
         if address.hasPrefix("/landing/demo/") { return URL(string: "https://hotlayout.com" + address) }
         return ImagePolicy.httpsOnly(address)
     })
@@ -71,20 +70,41 @@ struct ShowcaseScreen: View {
     let locale: String?
     let entry: String?
 
+    /// What the app is drawn from, read once per app and language, not on every evaluation of `body`.
+    private struct Loaded {
+        let document: Result<HotlayoutDocument, Error>
+        let theme: HotlayoutThemeSet
+        let host: (data: DataScope, now: Date?)
+    }
+
+    @State private var loaded: Loaded?
+
     var body: some View {
-        let defaults = UserDefaults.standard
-        let host = app.hostData(locale: locale ?? "en", scenario: defaults.string(forKey: "scenario"), tab: defaults.string(forKey: "tab"))
-        switch Result(catching: { try app.document(screenId: UserDefaults.standard.string(forKey: "screen")) }) {
-        case .success(let document):
-            HotlayoutScreen(
-                document: document, theme: app.theme(), data: host.data, locale: locale ?? "en", entry: entry,
-                timeZone: TimeZone(identifier: "UTC"), now: host.now, images: ShowcaseApp.images,
-                onAction: { action, _ in NSLog("action %@", action.type) },
-                onReport: { reports in reports.forEach { NSLog("report %@", String(describing: $0)) } }
+        Group {
+            switch loaded?.document {
+            case .success(let document)?:
+                if let loaded {
+                    HotlayoutScreen(
+                        document: document, theme: loaded.theme, data: loaded.host.data, locale: locale ?? "en", entry: entry,
+                        timeZone: TimeZone(identifier: "UTC"), now: loaded.host.now, images: ShowcaseApp.images,
+                        onAction: { action, _ in NSLog("action %@", action.type) },
+                        onReport: { reports in reports.forEach { NSLog("report %@", String(describing: $0)) } }
+                    )
+                    .id(app.rawValue + (locale ?? ""))
+                }
+            case .failure(let error)?:
+                Text("Could not open \(app.title): \(String(describing: error))").padding()
+            case nil:
+                Color.clear
+            }
+        }
+        .task(id: app.rawValue + (locale ?? "")) {
+            let defaults = UserDefaults.standard
+            loaded = Loaded(
+                document: Result { try app.document(screenId: defaults.string(forKey: "screen")) },
+                theme: app.theme(),
+                host: app.hostData(locale: locale ?? "en", scenario: defaults.string(forKey: "scenario"), tab: defaults.string(forKey: "tab"))
             )
-            .id(app.rawValue + (locale ?? ""))
-        case .failure(let error):
-            Text("Could not open \(app.title): \(String(describing: error))").padding()
         }
     }
 }

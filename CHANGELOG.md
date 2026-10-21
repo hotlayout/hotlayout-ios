@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- **Loaders as members.** `HotlayoutDocument.load(_:)`, `HotlayoutThemeSet.load(_:)`,
+  `HotlayoutVersions.check(_:readerVersion:)`, `HotlayoutVersions.checkDocument(_:)` and
+  `LocaleResolution.resolve(_:available:source:)` replace the global functions `loadDocument`,
+  `loadTheme`, `checkVersion`, `checkDocumentVersion` and `resolveLocale`, which stay as deprecated
+  forwards.
+- **README.** The example reads the document and the theme once, in `.task`, and shows the load
+  error, instead of parsing on every evaluation of `body`.
+- **Values for words.** `ScreenEntry.placement`, `ScreenEntry.statusBar`,
+  `ScreenShownEvent.placement`, `ScreenShownEvent.statusBar` and `HotlayoutTheme.appearance` give
+  `modalPlacement`, `statusBarIcons` and `brightness` as enums (`ModalPlacement`, `StatusBarIcons`,
+  `ThemeBrightness`). `ScreenShownEvent.modalPlacement` and `.statusBarIcons` are deprecated.
+- **Documentation.** One-line comments on the public declarations of the model, the JSON value and
+  the actions; the reason for the own JSON parser is stated; the module `HotLayout` and the types
+  `Hotlayout…` are named alike on purpose.
+- **Internal.** Widgets and actions are dispatched on enums instead of string literals; the token
+  name, whole number and absent value rules have one home; the icon file is parsed once; the
+  shared caches sit behind one lock type; the theme colour, gradient and role types are immutable.
+  The whole-string match is now used by the text-span rules as well, so a token name or a colour
+  with a trailing line feed is not read.
+- **Demo.** The showcase reads its document once per app and language instead of on every
+  evaluation of `body`.
 - **Border and rim.** The content of a rounded node is clipped by the inner edge of its border
   (the outer radius less the border width), so the background shows round the corners as it does
   along the straight edges, as in the other readers.

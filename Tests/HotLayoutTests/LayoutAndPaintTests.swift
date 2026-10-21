@@ -7,7 +7,7 @@ import XCTest
 /// size, a named side makes the box of an icon, a gradient lies over the
 /// role of a button, and the glass of a node.
 @MainActor
-final class LayoutFixTests: XCTestCase {
+final class LayoutAndPaintTests: XCTestCase {
     static let chrome = try! Contract.json("fixtures/media-chrome/media-chrome-cases.json")
 
     // MARK: the own glyph size (`x-style.layout.ownGlyphSize`)

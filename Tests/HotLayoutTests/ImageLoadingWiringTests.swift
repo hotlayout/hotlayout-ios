@@ -7,7 +7,7 @@ import XCTest
 /// report and no request, a host's own answer is final except for a script, a picture is loaded within
 /// the limits of the contract, and a report that comes after the first frame reaches `onReport`.
 @MainActor
-final class Contract928ImageWiringTests: XCTestCase {
+final class ImageLoadingWiringTests: XCTestCase {
     private var server: LocalServer?
 
     override func setUp() async throws { ImageStore.shared.reset() }

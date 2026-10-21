@@ -7,7 +7,7 @@ import XCTest
 /// draws and says it once, a number of a theme outside its bounds is drawn as the contract says, and a
 /// text that paints nothing is not part of the name of a card.
 @MainActor
-final class Contract928ScreenWiringTests: XCTestCase {
+final class ReaderEdgeScreenWiringTests: XCTestCase {
     final class Recorder {
         var reports: [HotlayoutReport] = []
     }
@@ -131,10 +131,10 @@ final class Contract928ScreenWiringTests: XCTestCase {
     }
 
     func testSilentCases() throws {
-        let rows = Contract.rows(Contract928CasesTests.silent, "silentCases")
+        let rows = Contract.rows(ReaderEdgeCasesTests.silent, "silentCases")
         XCTAssertEqual(rows.count, 12)
         for row in rows {
-            let name = Contract928CasesTests.name(row)
+            let name = ReaderEdgeCasesTests.name(row)
             let card = try nameOfCard(row)
             // The card is one element named by what is heard, in document order, and nothing that paints nothing.
             XCTAssertNotNil(find(card.view, label: card.heard.joined(separator: ", ")), "\(name): the name of the card is the heard texts; labels: \(card.labels)")

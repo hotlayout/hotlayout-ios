@@ -6,8 +6,8 @@ import XCTest
 /// Every screen of every fixture is drawn once, off screen: the reader must not crash on any
 /// document of this major, whatever widgets it has.
 @MainActor
-final class RenderSmokeTests: XCTestCase {
-    func testEveryFixtureScreenDraws() throws {
+final class RenderDoesNotCrashTests: XCTestCase {
+    func testEveryFixtureScreenDrawsWithoutCrashing() throws {
         let folder = Contract.root.appendingPathComponent("fixtures")
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter { $0.pathExtension == "json" }
         var drawn = 0
