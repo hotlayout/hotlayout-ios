@@ -238,7 +238,7 @@ final class ViewLifetimeTests: XCTestCase {
     }
 
     private func screens(_ ids: [String], initial: String, name: String = "n") throws -> HotlayoutDocument {
-        try loadDocument([
+        try HotlayoutDocument.load([
             "schemaVersion": "9.27.0", "documentId": "d", "name": .string(name), "initialScreenId": .string(initial),
             "screens": .array(ids.map { ["screenId": .string($0), "name": .string($0), "root": ["id": .string("r-\($0)"), "type": "Screen", "props": [:], "children": []]] }),
         ])
@@ -302,7 +302,7 @@ final class ViewLifetimeTests: XCTestCase {
     private func flow() throws -> Flow {
         let page: JSONValue = ["screenId": "a", "name": "A", "root": ["id": "ra", "type": "Screen", "props": [:], "children": []]]
         let sheet: JSONValue = ["screenId": "m", "name": "M", "presentation": "modal", "root": ["id": "rm", "type": "Screen", "props": [:], "children": []]]
-        let document = try loadDocument(["schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a", "screens": [page, sheet]])
+        let document = try HotlayoutDocument.load(["schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a", "screens": [page, sheet]])
         var flow = Flow(document: FlowDocument(document), entry: nil)
         _ = flow.press(["type": "navigate", "params": ["screenId": "m"]])
         return flow

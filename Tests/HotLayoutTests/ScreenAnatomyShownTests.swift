@@ -15,7 +15,8 @@ final class ScreenAnatomyShownTests: XCTestCase {
             func entry(_ object: JSONObject) -> FlowDocument.Screen {
                 FlowDocument.Screen(
                     screenId: object["screenId"]?.stringValue ?? "", presentation: object["presentation"]?.stringValue == "modal" ? .modal : .page,
-                    modalPlacement: object["modalPlacement"]?.stringValue, statusBarIcons: ScreenAnatomy.statusBarIcons(object["statusBarIcons"])
+                    placement: object["modalPlacement"]?.stringValue.flatMap(ModalPlacement.init(rawValue:)),
+                    statusBar: ScreenAnatomy.statusBarIcons(object["statusBarIcons"]).flatMap(StatusBarIcons.init(rawValue:))
                 )
             }
             var screens = stack.map(entry)

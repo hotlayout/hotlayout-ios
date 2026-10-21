@@ -44,7 +44,7 @@ struct SwipeConfirmButton: View {
     /// The host's `async` answer to the action of the busy state in progress.
     @State private var hostTask: Task<Void, Never>?
 
-    private var action: JSONObject { node.props["action"]?.objectValue ?? ["type": "none"] }
+    private var action: JSONObject { node.props["action"]?.objectValue ?? ["type": .string(ActionType.none.rawValue)] }
 
     private var height: Double {
         look.typography.lineBox + look.padding.top + look.padding.bottom + 2 * look.borderWidth

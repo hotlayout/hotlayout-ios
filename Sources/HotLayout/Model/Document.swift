@@ -67,16 +67,19 @@ public struct ScreenEntry: Equatable, Sendable {
     public let name: String
     /// Whether the screen is a page or a modal layer.
     public let presentation: ScreenPresentation
-    /// `bottom` or `center`; only known words are kept (`unknownModalPlacement`).
-    public let modalPlacement: String?
-    /// `modalPlacement` as a value; `nil` for a screen that names none.
-    public var placement: ModalPlacement? { modalPlacement.flatMap(ModalPlacement.init(rawValue:)) }
-    /// `light` or `dark`: the screen's request about the icons of the system status bar
-    /// (`statusBarIcons`). The reader does not touch the status bar; the request goes to the
-    /// host with the screen-shown event.
-    public let statusBarIcons: String?
-    /// `statusBarIcons` as a value; `nil` for a screen that names none.
-    public var statusBar: StatusBarIcons? { statusBarIcons.flatMap(StatusBarIcons.init(rawValue:)) }
+    /// Where a modal layer lies (`modalPlacement`); `nil` for a screen that names no known word
+    /// (`unknownModalPlacement`).
+    public let placement: ModalPlacement?
+    /// The screen's request about the icons of the system status bar (`statusBarIcons`); `nil`
+    /// for a screen that names none. The reader does not touch the status bar; the request goes
+    /// to the host with the screen-shown event.
+    public let statusBar: StatusBarIcons?
+    /// `bottom` or `center`.
+    @available(*, deprecated, message: "Use `placement`.")
+    public var modalPlacement: String? { placement?.rawValue }
+    /// `light` or `dark`.
+    @available(*, deprecated, message: "Use `statusBar`.")
+    public var statusBarIcons: String? { statusBar?.rawValue }
     /// Blur radius under a modal layer, 1…40; `nil` without a valid field or on a page.
     public let backdropBlur: Int?
     /// `false` only for a modal layer that waits for an action inside it.
@@ -219,15 +222,14 @@ enum DocumentReader {
             }
             if treeDepth(rootValue) > maxParseDepth + 1 { throw HotlayoutLoadError.maxDepthExceeded(screenId: screenId) }
             guard let root = node(rootValue, location: "screen “\(screenId)”", position: "root", sink: sink) else { continue }
-            let placement = entry["modalPlacement"]?.stringValue
-            let isModal = entry["presentation"]?.stringValue == "modal"
+            let isModal = entry["presentation"]?.stringValue == ScreenPresentation.modal.rawValue
             screens.append(
                 ScreenEntry(
                     screenId: screenId,
                     name: entry["name"]?.stringValue ?? "",
                     presentation: isModal ? .modal : .page,
-                    modalPlacement: placement == "bottom" || placement == "center" ? placement : nil,
-                    statusBarIcons: ScreenAnatomy.statusBarIcons(entry["statusBarIcons"]),
+                    placement: entry["modalPlacement"]?.stringValue.flatMap(ModalPlacement.init(rawValue:)),
+                    statusBar: ScreenAnatomy.statusBarIcons(entry["statusBarIcons"]).flatMap(StatusBarIcons.init(rawValue:)),
                     backdropBlur: isModal ? ModalRules.blurRadius(entry["backdropBlur"]) : nil,
                     dismissible: !(isModal && entry["dismissible"]?.boolValue == false),
                     root: root

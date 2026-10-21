@@ -16,7 +16,7 @@ struct NavBarWidget: View {
     @ViewBuilder
     private var bottomBar: some View {
         let theme = context.theme
-        let items = node.children.filter { $0.type == "NavItem" && context.isShown($0) }.prefix(NavBarRules.maxItems)
+        let items = node.children.filter { $0.widget == .navItem && context.isShown($0) }.prefix(NavBarRules.maxItems)
         let line = style["border"] == nil ? 1.0 : 0.0
         let surface = style["background"] == nil ? (theme.coreColor("surface")).color : Color.clear
         let borderColor = (theme.coreColor("border")).color
@@ -25,7 +25,7 @@ struct NavBarWidget: View {
         VStack(spacing: 0) {
             EqualSharesLayout {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    NodeView(node: item, context: child, placement: .stretched, depth: depth + 1, parentType: "NavBar")
+                    NodeView(node: item, context: child, placement: .stretched, depth: depth + 1, parentType: WidgetType.navBar.rawValue)
                 }
             }
             .contentColumn(context.contentMaxWidth)
@@ -47,7 +47,7 @@ extension NavBarWidget {
     /// line UNDER it, unless the node names its own background or border.
     fileprivate var ownBar: some View {
         let theme = context.theme
-        let items = node.children.filter { $0.type == "NavItem" && context.isShown($0) }.prefix(NavBarRules.maxItems)
+        let items = node.children.filter { $0.widget == .navItem && context.isShown($0) }.prefix(NavBarRules.maxItems)
         let line = style["border"] == nil ? 1.0 : 0.0
         let surface = style["background"] == nil ? (theme.coreColor("surface")).color : Color.clear
         let borderColor = (theme.coreColor("border")).color
@@ -56,7 +56,7 @@ extension NavBarWidget {
         return VStack(spacing: 0) {
             WideNavRowLayout(metrics: WideChrome.metrics(theme: theme)) {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    NodeView(node: item, context: child, placement: .natural, depth: depth + 1, parentType: "NavBar")
+                    NodeView(node: item, context: child, placement: .natural, depth: depth + 1, parentType: WidgetType.navBar.rawValue)
                 }
             }
             .contentColumn(context.contentMaxWidth)
@@ -124,7 +124,7 @@ struct NavItemWidget: View {
 
     var body: some View {
         let theme = context.theme
-        let action = node.props["action"]?.objectValue ?? ["type": "none"]
+        let action = node.props["action"]?.objectValue ?? ["type": .string(ActionType.none.rawValue)]
         let active = NavBarRules.isActive(action, shown: context.screenId)
         let named = context.inherited.colorRef
         let colorRef: JSONValue = active ? (named ?? "primary") : (named.map { PartStyleRules.withOpacity($0, ListTileRules.secondaryOpacity) } ?? "muted")
@@ -169,7 +169,7 @@ struct NavItemWidget: View {
         label: String, name: String, icon: IconResolution, box: (glyph: Double, box: CGSize), color: RGBA, active: Bool, showsDot: Bool
     ) -> some View {
         let theme = context.theme
-        let action = node.props["action"]?.objectValue ?? ["type": "none"]
+        let action = node.props["action"]?.objectValue ?? ["type": .string(ActionType.none.rawValue)]
         let metrics = WideChrome.metrics(theme: theme)
         let typography = theme.typography["bodyM"] ?? context.inherited.typography
         let block = theme.coreSpacing("sm")

@@ -202,7 +202,7 @@ public struct HotlayoutScreen: View {
             ModalStack(
                 layers: layerScreens.keys.sorted().compactMap { index in
                     layerScreens[index].map { screen in
-                        let placement = screen.modalPlacement.map(JSONValue.string)
+                        let placement = screen.placement.map { JSONValue.string($0.rawValue) }
                         return ModalStackLayer(
                             id: index, shape: WideChrome.modalShape(placement: placement, areaWidth: areaWidth), placement: placement,
                             blur: screen.backdropBlur, dismissible: screen.dismissible)
@@ -231,7 +231,7 @@ public struct HotlayoutScreen: View {
             .ignoresSafeArea(.all, edges: .vertical)
         }
         .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight)
-        .environment(\.glassOnDarkTheme, themeSet.theme(themeId).brightness == "dark")
+        .environment(\.glassOnDarkTheme, themeSet.theme(themeId).appearance == .dark)
         .environment(\.countdownClockPinned, now != nil)
         .onAppear {
             if self.flow == nil {

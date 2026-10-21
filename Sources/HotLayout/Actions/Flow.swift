@@ -37,7 +37,7 @@ public struct ScreenShownEvent: Equatable, Sendable {
 
     init(
         documentId: String, screenId: String, entry: String?, presentation: ScreenPresentation, cause: ScreenShownCause, depth: Int,
-        record: DataScope?, modalPlacement: String?, statusBarIcons: String?
+        record: DataScope?, placement: ModalPlacement?, statusBar: StatusBarIcons?
     ) {
         self.documentId = documentId
         self.screenId = screenId
@@ -46,8 +46,8 @@ public struct ScreenShownEvent: Equatable, Sendable {
         self.cause = cause
         self.depth = depth
         self.record = record
-        self.placement = modalPlacement.flatMap(ModalPlacement.init(rawValue:))
-        self.statusBar = statusBarIcons.flatMap(StatusBarIcons.init(rawValue:))
+        self.placement = placement
+        self.statusBar = statusBar
     }
 }
 
@@ -97,14 +97,14 @@ struct FlowDocument: Equatable, Sendable {
     struct Screen: Equatable, Sendable {
         let screenId: String
         let presentation: ScreenPresentation
-        let modalPlacement: String?
-        let statusBarIcons: String?
+        let placement: ModalPlacement?
+        let statusBar: StatusBarIcons?
 
-        init(screenId: String, presentation: ScreenPresentation, modalPlacement: String? = nil, statusBarIcons: String? = nil) {
+        init(screenId: String, presentation: ScreenPresentation, placement: ModalPlacement? = nil, statusBar: StatusBarIcons? = nil) {
             self.screenId = screenId
             self.presentation = presentation
-            self.modalPlacement = modalPlacement
-            self.statusBarIcons = statusBarIcons
+            self.placement = placement
+            self.statusBar = statusBar
         }
     }
 
@@ -127,7 +127,7 @@ struct FlowDocument: Equatable, Sendable {
         self.init(
             documentId: document.documentId,
             screens: document.screens.map {
-                Screen(screenId: $0.screenId, presentation: $0.presentation, modalPlacement: $0.modalPlacement, statusBarIcons: $0.statusBarIcons)
+                Screen(screenId: $0.screenId, presentation: $0.presentation, placement: $0.placement, statusBar: $0.statusBar)
             },
             initialScreenId: document.initialScreenId,
             entryPoints: document.entryPoints,
@@ -214,8 +214,8 @@ struct Flow: Equatable, Sendable {
             cause: cause,
             depth: stack.count,
             record: top.record,
-            modalPlacement: modal ? screen?.modalPlacement : nil,
-            statusBarIcons: screen?.statusBarIcons
+            placement: modal ? screen?.placement : nil,
+            statusBar: screen?.statusBar
         )
     }
 
@@ -339,7 +339,7 @@ extension Flow {
     /// asked of the host like `navigate.back`, then the top frame goes. Nothing on the first screen.
     mutating func dismissLayer(allowNavigation: (NavigationEvent.Kind, String, String, HotlayoutAction) -> Bool) -> ScreenShownEvent? {
         guard stack.count > 1 else { return nil }
-        let back = ActionCatalog.handed(["type": "navigate.back"], scope: [:])
+        let back = ActionCatalog.handed(["type": .string(ActionType.navigateBack.rawValue)], scope: [:])
         guard allowNavigation(.back, stack[stack.count - 1].screenId, stack[stack.count - 2].screenId, back) else { return nil }
         stack.removeLast()
         return shownEvent(cause: .back)

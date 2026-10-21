@@ -116,7 +116,7 @@ final class ActionCasesTests: XCTestCase {
     static func flowDocument(_ row: JSONObject, documentId: String) -> FlowDocument {
         let placements = row["modalPlacement"]?.objectValue ?? JSONObject()
         let screens = (row["screens"]?.objectValue ?? JSONObject()).map { id, presentation in
-            FlowDocument.Screen(screenId: id, presentation: presentation.stringValue == "modal" ? .modal : .page, modalPlacement: placements[id]?.stringValue)
+            FlowDocument.Screen(screenId: id, presentation: presentation.stringValue == "modal" ? .modal : .page, placement: placements[id]?.stringValue.flatMap(ModalPlacement.init(rawValue:)))
         }
         var entryPoints: [String: String] = [:]
         for (name, target) in row["entryPoints"]?.objectValue ?? JSONObject() { entryPoints[name] = target.stringValue }

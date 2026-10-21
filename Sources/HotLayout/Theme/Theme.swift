@@ -112,10 +112,11 @@ public enum ThemeBrightness: String, Equatable, Sendable {
 public struct HotlayoutTheme: Equatable, Sendable {
     /// The identifier of the theme.
     public internal(set) var id: String
-    /// `light` or `dark`; see `appearance`.
-    public internal(set) var brightness: String
-    /// `brightness` as a value; anything but `dark` reads as `light`, as the theme reader does.
-    public var appearance: ThemeBrightness { brightness == ThemeBrightness.dark.rawValue ? .dark : .light }
+    /// Whether the theme is light or dark (`brightness`); anything but `dark` reads as `light`.
+    public internal(set) var appearance: ThemeBrightness
+    /// `light` or `dark`.
+    @available(*, deprecated, message: "Use `appearance`.")
+    public var brightness: String { appearance.rawValue }
     /// The spacing steps by name, in logical pixels.
     public internal(set) var spacing: [String: Double]
     /// The corner radii by name, in logical pixels.
@@ -147,7 +148,7 @@ public struct HotlayoutTheme: Equatable, Sendable {
     /// when this theme lacks it. A theme read by `loadTheme` is already filled from it.
     private var builtInTwin: HotlayoutTheme {
         let set = HotlayoutThemeSet.builtIn
-        return set.themes.values.first { $0.brightness == brightness } ?? set.theme()
+        return set.themes.values.first { $0.appearance == appearance } ?? set.theme()
     }
 
     /// A colour of the core of the theme, with the built-in value standing in.
@@ -269,9 +270,9 @@ enum ThemeReader {
                 sink.add(.ignoredInput, "theme “\(id)”", "a theme that is not an object is skipped")
                 continue
             }
-            let brightness = theme["brightness"]?.stringValue == "dark" ? "dark" : "light"
-            let fallback = base?.themes.values.first { $0.brightness == brightness } ?? base?.theme()
-            themes[id] = readTheme(id: id, theme, brightness: brightness, fallback: fallback, sink: sink)
+            let appearance: ThemeBrightness = theme["brightness"]?.stringValue == ThemeBrightness.dark.rawValue ? .dark : .light
+            let fallback = base?.themes.values.first { $0.appearance == appearance } ?? base?.theme()
+            themes[id] = readTheme(id: id, theme, appearance: appearance, fallback: fallback, sink: sink)
         }
         guard !themes.isEmpty else { return nil }
         let defaultId = object["defaultThemeId"]?.stringValue.flatMap { themes[$0] != nil ? $0 : nil } ?? themes.keys.sorted().first!
@@ -279,14 +280,14 @@ enum ThemeReader {
             themeContractVersion: object["themeContractVersion"]?.stringValue ?? HotlayoutVersions.theme, defaultThemeId: defaultId, themes: themes)
     }
 
-    static func readTheme(id: String, _ theme: JSONObject, brightness: String, fallback: HotlayoutTheme?, sink: ReportSink) -> HotlayoutTheme {
+    static func readTheme(id: String, _ theme: JSONObject, appearance: ThemeBrightness, fallback: HotlayoutTheme?, sink: ReportSink) -> HotlayoutTheme {
         var result =
             fallback
             ?? HotlayoutTheme(
-                id: id, brightness: brightness, spacing: [:], radius: [:], color: [:], typography: [:], elevation: [:], gradient: [:], fontFamilies: [:],
+                id: id, appearance: appearance, spacing: [:], radius: [:], color: [:], typography: [:], elevation: [:], gradient: [:], fontFamilies: [:],
                 roles: [:])
         result.id = id
-        result.brightness = brightness
+        result.appearance = appearance
         let place = "theme “\(id)”"
         func fit(_ value: Double, _ bounds: ThemeNumbers.Bounds, builtIn: Double? = nil, _ where: String) -> Double {
             ThemeNumbers.fit(value, bounds, builtIn: builtIn, place: place, at: `where`, sink: sink)

@@ -35,7 +35,7 @@ final class ScreenTopWiringTests: XCTestCase {
         children.append(block("tall", height: 3000))
         var props: JSONObject = ["gap": "none"]
         if bodyTop { props["bodyTop"] = "screenTop" }
-        return try loadDocument([
+        return try HotlayoutDocument.load([
             "schemaVersion": "9.28.0", "documentId": "d", "name": "n", "initialScreenId": "a",
             "screens": [["screenId": "a", "name": "A", "root": [
                 "id": "r", "type": "Screen", "props": .object(props),
@@ -104,7 +104,7 @@ final class ScreenTopWiringTests: XCTestCase {
             "id": "avatar", "type": "Image", "props": ["source": ["kind": "asset", "asset": "placeholder"], "aspectRatio": "1:1", "fit": "cover"],
             "style": ["width": 100, "height": 100, "radius": "pill", "border": ["width": 4, "color": ["value": "#00ff00"]]],
         ]
-        let doc = try loadDocument([
+        let doc = try HotlayoutDocument.load([
             "schemaVersion": "9.28.0", "documentId": "d", "name": "n", "initialScreenId": "a",
             "screens": [["screenId": "a", "name": "A", "root": [
                 "id": "r", "type": "Screen", "props": ["gap": "none"],

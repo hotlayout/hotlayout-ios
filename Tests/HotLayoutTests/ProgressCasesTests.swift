@@ -12,7 +12,7 @@ final class ProgressCasesTests: XCTestCase {
 
     static func theme(_ json: JSONValue?) -> HotlayoutTheme {
         func map(_ key: String) -> [String: Double] { (json?[key]?.objectValue ?? JSONObject()).keys.reduce(into: [:]) { $0[$1] = json?[key]?[$1]?.numberValue } }
-        var theme = HotlayoutTheme(id: "table", brightness: "light", spacing: map("spacing"), radius: map("radius"), color: [:], typography: [:], elevation: [:], gradient: [:], fontFamilies: [:], roles: [:])
+        var theme = HotlayoutTheme(id: "table", appearance: .light, spacing: map("spacing"), radius: map("radius"), color: [:], typography: [:], elevation: [:], gradient: [:], fontFamilies: [:], roles: [:])
         for (name, value) in json?["color"]?.objectValue ?? JSONObject() { theme.color[name] = value.stringValue.flatMap(RGBA.init(hex:)) }
         for (name, value) in json?["gradient"]?.objectValue ?? JSONObject() {
             let stops = (value["stops"]?.arrayValue ?? []).compactMap { stop -> GradientValue.Stop? in

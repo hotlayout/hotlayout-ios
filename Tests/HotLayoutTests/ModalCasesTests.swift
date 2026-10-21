@@ -191,7 +191,7 @@ final class ModalCasesTests: XCTestCase {
         XCTAssertEqual(rows.count, 11)
         for row in rows {
             let stack = (row["stack"]?.arrayValue ?? []).compactMap(\.objectValue)
-            let screens = stack.map { FlowDocument.Screen(screenId: $0["screenId"]?.stringValue ?? "", presentation: $0["presentation"]?.stringValue == "modal" ? .modal : .page, modalPlacement: $0["modalPlacement"]?.stringValue) }
+            let screens = stack.map { FlowDocument.Screen(screenId: $0["screenId"]?.stringValue ?? "", presentation: $0["presentation"]?.stringValue == "modal" ? .modal : .page, placement: $0["modalPlacement"]?.stringValue.flatMap(ModalPlacement.init(rawValue:))) }
             var flow = Flow(document: FlowDocument(documentId: "d", screens: screens, initialScreenId: screens.first?.screenId, entryPoints: [:]), entry: nil)
             var event: ScreenShownEvent?
             switch row["transition"]?.stringValue {
