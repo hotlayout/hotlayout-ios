@@ -19,7 +19,8 @@ enum RecordGroups {
     static func isSame(_ left: JSONValue?, _ right: JSONValue?) -> Bool {
         func missing(_ value: JSONValue?) -> Bool { ContractShapes.isAbsent(value) }
         if missing(left) || missing(right) { return missing(left) && missing(right) }
-        switch (left!, right!) {
+        guard let left, let right else { return false }
+        switch (left, right) {
         case (.string(let a), .string(let b)): return a == b
         case (.number(let a), .number(let b)): return a == b
         case (.bool(let a), .bool(let b)): return a == b

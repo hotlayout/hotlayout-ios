@@ -32,8 +32,7 @@ enum IconSet {
     static let gridSize = 24.0
     static let defaultStrokeWidth = 2.0
 
-    private static let lock = NSLock()
-    private static var parsed: [String: [IconElement]] = [:]
+    private static let parsed = LockedValue<[String: [IconElement]]>([:])
 
     /// The shipped file, parsed once.
     private static let shipped: JSONValue? = {
@@ -60,17 +59,10 @@ enum IconSet {
     /// The elements of an icon, or `nil` for a name the set does not have (`unknownIcon:
     /// 'empty-box-same-size'`: the caller keeps an empty box of the same size).
     static func elements(_ name: String) -> [IconElement]? {
-        lock.lock()
-        if let known = parsed[name] {
-            lock.unlock()
-            return known
-        }
-        lock.unlock()
+        if let known = parsed.withLock({ $0[name] }) { return known }
         guard let body = bodies[name] else { return nil }
         let elements = IconBody.parse(body)
-        lock.lock()
-        parsed[name] = elements
-        lock.unlock()
+        parsed.withLock { $0[name] = elements }
         return elements
     }
 }

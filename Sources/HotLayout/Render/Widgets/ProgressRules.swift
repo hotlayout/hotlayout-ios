@@ -186,7 +186,7 @@ enum ProgressRules {
         Swift.max(0, Double(segments - 1) * gap)
     }
 
-    // MARK: Steps during a transition (9.25.0)
+    // MARK: Steps during a transition
 
     /// `U(from) + (U(to) − U(from)) × e`, `U` the whole steps at rest; both ends are pictures at rest.
     static func segmentUnits(fromRatio: Double, toRatio: Double, eased: Double, segments: Int) -> Double {
@@ -214,7 +214,7 @@ enum ProgressRules {
         return Swift.min(1, Swift.max(0, (shown - from) / (to - from)))
     }
 
-    // MARK: Round ends (9.21.0)
+    // MARK: Round ends
 
     enum RingCapKind: String { case none, dot, arc, full }
 
@@ -248,7 +248,7 @@ enum ProgressRules {
 
     static func barCapRadius(thickness: Double) -> Double { Swift.max(0, thickness / 2) }
 
-    // MARK: Glow (9.25.0)
+    // MARK: Glow
 
     enum Glow: String {
         case soft, strong

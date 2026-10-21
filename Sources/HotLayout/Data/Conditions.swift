@@ -28,10 +28,10 @@ enum Conditions {
     /// For `disabledIf`: only a condition the reader UNDERSTANDS can disable a control; an
     /// unknown operator does not.
     static func understoodHolds(_ condition: JSONValue?, scope: DataScope) -> Bool {
-        guard let object = condition?.objectValue, object["path"]?.stringValue != nil,
+        guard let condition, let object = condition.objectValue, object["path"]?.stringValue != nil,
             let op = object["op"]?.stringValue, knownOps.contains(op)
         else { return false }
-        return holds(condition!, scope: scope, filterable: true)
+        return holds(condition, scope: scope, filterable: true)
     }
 
     /// An operand from another path that is absent, `null` or the empty string.
@@ -47,7 +47,7 @@ enum Conditions {
 
     private static func holds(_ condition: JSONValue, scope: DataScope, filterable: Bool) -> Bool {
         guard let object = condition.objectValue, let path = object["path"]?.stringValue, let op = object["op"]?.stringValue else { return true }
-        // Emptiness of a FILTERED list (9.23.0): the records that pass are counted, without `limit`.
+        // Emptiness of a FILTERED list: the records that pass are counted, without `limit`.
         if filterable, op == "isEmpty" || op == "isNotEmpty", let filter = object["where"], filter.objectValue != nil {
             return somePasses(scope: scope, path: path, filter: filter, item: object["item"]?.stringValue ?? "") == (op == "isNotEmpty")
         }

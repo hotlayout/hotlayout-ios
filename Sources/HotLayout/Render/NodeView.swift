@@ -84,7 +84,7 @@ struct NodeView: View {
         return outer
     }
 
-    /// Containers with an action are pressable as a whole (9.19.0).
+    /// Containers with an action are pressable as a whole.
     @ViewBuilder
     private func pressable(_ content: some View, _ context: RenderContext) -> some View {
         if PressTarget.containerTypes.contains(node.widget) {

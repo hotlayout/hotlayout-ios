@@ -8,17 +8,13 @@ import Foundation
 ///    Spanish write «1850», while the contract says «1.850»;
 ///  - rounding half away from zero over the shortest decimal string (`DecimalText`).
 enum NumberText {
-    private static let lock = NSLock()
-    private static var formatters: [String: NumberFormatter] = [:]
-    private static var available: Set<String>?
+    private static let formatters = LockedValue<[String: NumberFormatter]>([:])
+    private static let available = Set(Locale.availableIdentifiers.map { $0.lowercased() })
     private static let cacheLimit = 64
 
     /// Whether the platform has locale data for a tag or any of its shorter forms.
     static func hasData(_ tag: String) -> Bool {
-        lock.lock()
-        if available == nil { available = Set(Locale.availableIdentifiers.map { $0.lowercased() }) }
-        let known = available ?? []
-        lock.unlock()
+        let known = available
         guard let normalized = LocaleTags.normalize(tag) else { return false }
         return LocaleTags.lookupChain(normalized).contains { known.contains($0.replacingOccurrences(of: "-", with: "_").lowercased()) }
     }
@@ -45,20 +41,20 @@ enum NumberText {
 
     private static func formatter(_ locale: String?, minimumFraction: Int, maximumFraction: Int, minimumInteger: Int) -> NumberFormatter {
         let key = "\(locale ?? "")|\(minimumFraction)|\(maximumFraction)|\(minimumInteger)"
-        lock.lock()
-        defer { lock.unlock() }
-        if let known = formatters[key] { return known }
-        let formatter = NumberFormatter()
-        formatter.locale = locale.map { Locale(identifier: $0) } ?? Locale.current
-        formatter.numberStyle = .decimal
-        formatter.usesGroupingSeparator = false
-        formatter.minimumFractionDigits = minimumFraction
-        formatter.maximumFractionDigits = maximumFraction
-        formatter.minimumIntegerDigits = minimumInteger
-        formatter.roundingMode = .halfUp
-        if formatters.count >= cacheLimit { formatters.removeAll() }
-        formatters[key] = formatter
-        return formatter
+        return formatters.withLock { cache in
+            if let known = cache[key] { return known }
+            let formatter = NumberFormatter()
+            formatter.locale = locale.map { Locale(identifier: $0) } ?? Locale.current
+            formatter.numberStyle = .decimal
+            formatter.usesGroupingSeparator = false
+            formatter.minimumFractionDigits = minimumFraction
+            formatter.maximumFractionDigits = maximumFraction
+            formatter.minimumIntegerDigits = minimumInteger
+            formatter.roundingMode = .halfUp
+            if cache.count >= cacheLimit { cache.removeAll() }
+            cache[key] = formatter
+            return formatter
+        }
     }
 
     /// A number written in a locale, split at the decimal sign: `integer` carries the sign
@@ -112,15 +108,15 @@ enum NumberText {
     /// a code the platform does not know gets two.
     static func currencyFractionDigits(_ code: String) -> Int {
         let key = "currency|\(code)"
-        lock.lock()
-        defer { lock.unlock() }
-        if let known = formatters[key] { return known.maximumFractionDigits }
-        let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: "en")
-        formatter.numberStyle = .currency
-        formatter.currencyCode = code
-        formatters[key] = formatter
-        return formatter.maximumFractionDigits
+        return formatters.withLock { cache in
+            if let known = cache[key] { return known.maximumFractionDigits }
+            let formatter = NumberFormatter()
+            formatter.locale = Locale(identifier: "en")
+            formatter.numberStyle = .currency
+            formatter.currencyCode = code
+            cache[key] = formatter
+            return formatter.maximumFractionDigits
+        }
     }
 
     /// Whether a number is written as zero under the given fraction digits (no digit 1–9).

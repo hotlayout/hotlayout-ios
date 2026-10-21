@@ -36,7 +36,7 @@ struct AlignmentRead: Equatable {
 /// cross axis. Placement code reads these and nothing else.
 enum AlignRules {
     /// The host of a node (`Screen`, `Column`, a `Container` with a direction); `nil` for a node
-    /// that has no fields of 9.15.0. A `Row` is not a host: its fields are older and have schema
+    /// that has no alignment fields. A `Row` is not a host: its fields are older and have schema
     /// defaults. A container without `direction` is a column.
     static func read(type: String, props: JSONObject) -> AlignmentRead? {
         let axis: MainAxis

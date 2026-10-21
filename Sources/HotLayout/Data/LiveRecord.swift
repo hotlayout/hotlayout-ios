@@ -19,7 +19,7 @@ struct RecordLink: Equatable, Sendable {
 /// `Repeater` with that `item`): screens in document order, depth first, each collection once.
 typealias EntitySources = [String: [String]]
 
-/// The live record of a page (`x-liveRecord`, 9.27.0).
+/// The live record of a page (`x-liveRecord`).
 ///
 /// The record a frame of the stack holds is a CHAIN of links, outer first; the record itself is
 /// the overlay of the links, the inner one stronger. When the host gives new collections, every
