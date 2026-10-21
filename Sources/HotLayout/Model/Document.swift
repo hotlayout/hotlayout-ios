@@ -148,7 +148,7 @@ public struct HotlayoutDocument: Equatable, Sendable {
 public enum HotlayoutLoadError: Error, Equatable, CustomStringConvertible, Sendable {
     case malformedJSON(String)
     case notADocument(String)
-    /// The JSON is not a theme contract this reader can use (`loadTheme`).
+    /// The JSON is not a theme contract this reader can use (`HotlayoutThemeSet.load(_:)`).
     case notATheme(String)
     case incompatibleVersion(VersionVerdict)
     case maxDepthExceeded(screenId: String)

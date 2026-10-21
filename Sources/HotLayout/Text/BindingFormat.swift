@@ -3,7 +3,7 @@ import Foundation
 /// What turns a data value into text: the data, the format locale, the zone and «now».
 struct TextEnvironment: Sendable {
     var scope: DataScope
-    /// The format locale (`formatting` of `resolveLocale`); `nil` means the device language.
+    /// The format locale (`formatting` of `LocaleResolution.resolve`); `nil` means the device language.
     var formattingLocale: String?
     /// The language of the shown text, used when the platform rejects the format locale.
     var fallbackLocale: String?

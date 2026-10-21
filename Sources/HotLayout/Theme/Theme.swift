@@ -145,7 +145,7 @@ public struct HotlayoutTheme: Equatable, Sendable {
     static let optionalColorFallbacks = ["locked": "muted", "inProgress": "accent", "completed": "success"]
 
     /// The built-in theme of the same brightness: where a core token the reader needs comes from
-    /// when this theme lacks it. A theme read by `loadTheme` is already filled from it.
+    /// when this theme lacks it. A theme read by `HotlayoutThemeSet.load(_:)` is already filled from it.
     private var builtInTwin: HotlayoutTheme {
         let set = HotlayoutThemeSet.builtIn
         return set.themes.values.first { $0.appearance == appearance } ?? set.theme()
@@ -180,7 +180,7 @@ public struct HotlayoutThemeSet: Equatable, Sendable {
     public let defaultThemeId: String
     /// The themes by identifier.
     public let themes: [String: HotlayoutTheme]
-    /// What the reader skipped or replaced while reading the theme (`loadTheme`); not part of
+    /// What the reader skipped or replaced while reading the theme (`HotlayoutThemeSet.load(_:)`); not part of
     /// equality. `HotlayoutScreen` hands these to `onReport` with its own.
     public internal(set) var reports: [HotlayoutReport] = []
 
