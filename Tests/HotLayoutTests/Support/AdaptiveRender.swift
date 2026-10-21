@@ -25,7 +25,7 @@ enum AdaptiveRender {
             ("screens", .array([.object(JSONObject([("screenId", "s"), ("name", "s"), ("root", root)]))] + extra)),
         ])
         if let localization { object["localization"] = localization }
-        return try loadDocument(.object(object))
+        return try HotlayoutDocument.load(.object(object))
     }
 
     static func screenRoot(_ children: [JSONValue], props: JSONObject = JSONObject(), style: JSONValue? = nil, propsOn: JSONValue? = nil, fields: JSONObject = JSONObject()) -> JSONValue {

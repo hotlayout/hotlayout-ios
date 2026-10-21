@@ -74,26 +74,25 @@ enum DateText {
         }
     }
 
-    private static let lock = NSLock()
-    private static var formatters: [String: DateFormatter] = [:]
+    private static let formatters = LockedValue<[String: DateFormatter]>([:])
 
     private static func formatter(skeleton: String, locale: String?, timeZone: TimeZone?) -> DateFormatter {
         let key = "\(skeleton)|\(locale ?? "")|\(timeZone?.identifier ?? "")"
-        lock.lock()
-        defer { lock.unlock() }
-        if let known = formatters[key] { return known }
-        let formatter = DateFormatter()
-        let resolved = locale.map { Locale(identifier: $0) } ?? Locale.current
-        formatter.locale = resolved
-        // `x-template.dateCalendar`: Gregorian in every locale (otherwise Thai would write 2569).
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = resolved
-        formatter.calendar = calendar
-        formatter.timeZone = timeZone ?? TimeZone.current
-        formatter.setLocalizedDateFormatFromTemplate(skeleton)
-        if formatters.count >= 64 { formatters.removeAll() }
-        formatters[key] = formatter
-        return formatter
+        return formatters.withLock { cache in
+            if let known = cache[key] { return known }
+            let formatter = DateFormatter()
+            let resolved = locale.map { Locale(identifier: $0) } ?? Locale.current
+            formatter.locale = resolved
+            // `x-template.dateCalendar`: Gregorian in every locale (otherwise Thai would write 2569).
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.locale = resolved
+            formatter.calendar = calendar
+            formatter.timeZone = timeZone ?? TimeZone.current
+            formatter.setLocalizedDateFormatFromTemplate(skeleton)
+            if cache.count >= 64 { cache.removeAll() }
+            cache[key] = formatter
+            return formatter
+        }
     }
 
     /// A date, a time or both in a locale, or `nil` when the format does not apply.

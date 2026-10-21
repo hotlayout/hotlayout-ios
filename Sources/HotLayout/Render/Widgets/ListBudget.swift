@@ -73,7 +73,7 @@ enum ListBudget {
 
         func countAll(_ node: DocumentNode, _ outer: DataScope) {
             if plan.notDrawn >= countCeiling { return }
-            guard node.type == "Repeater" else {
+            guard node.widget == .repeater else {
                 for child in node.children { countAll(child, outer) }
                 return
             }
@@ -84,7 +84,7 @@ enum ListBudget {
         }
 
         func walk(_ node: DocumentNode, _ outer: DataScope, _ path: [Int]) {
-            guard node.type == "Repeater" else {
+            guard node.widget == .repeater else {
                 for child in node.children { walk(child, outer, path) }
                 return
             }

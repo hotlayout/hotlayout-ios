@@ -24,7 +24,7 @@ struct PressableCard<Content: View>: View {
 
     private func card(press: JSONObject?, long: JSONObject?) -> some View {
         let name =
-            node.type == "ListTile"
+            node.widget == .listTile
             ? ["title", "subtitle"].filter { node.props[$0] != nil }.map { ShownText.of(context.text(node, field: $0)) }.filter { !$0.isEmpty }.joined(
                 separator: ", ")
             : PressTarget.name(of: node, shown: { context.isShown($0) }, paintOf: { SilentText.paint(chain: $0, context: context) }) {

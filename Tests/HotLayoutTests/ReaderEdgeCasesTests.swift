@@ -4,9 +4,9 @@ import XCTest
 
 /// The tables of schema 9.28.0 that are rules as functions: the address of a picture, the list
 /// budget, the numbers of a theme and the paint of a text. The same rules through the real screen
-/// are in `Contract928WiringTests`.
+/// are in `ReaderEdgeScreenWiringTests` and `ImageLoadingWiringTests`.
 @MainActor
-final class Contract928CasesTests: XCTestCase {
+final class ReaderEdgeCasesTests: XCTestCase {
     static let images = try! Contract.json("fixtures/image-source/image-source-cases.json")
     static let budget = try! Contract.json("fixtures/repeater-filter/list-budget-cases.json")
     static let numbers = try! Contract.json("fixtures/theme-numbers/theme-number-cases.json")
@@ -194,7 +194,7 @@ final class Contract928CasesTests: XCTestCase {
             given = row["value"] ?? .null
         }
         contract = setting(contract, path, to: given)
-        return (try loadTheme(contract), id)
+        return (try HotlayoutThemeSet.load(contract), id)
     }
 
     private func drawn(_ row: JSONObject, _ read: (set: HotlayoutThemeSet, id: String)) throws -> Double {
@@ -267,7 +267,7 @@ final class Contract928CasesTests: XCTestCase {
     /// A JSON parser reads `1e309` as infinity: the text of a theme with it is replaced, not skipped.
     func testInfinityFromTheTextOfATheme() throws {
         let text = #"{"themeContractVersion":"4.0.1","defaultThemeId":"light","themes":{"light":{"id":"light","brightness":"light","spacing":{"md":1e309,"hero":-1e309}}}}"#
-        let set = try loadTheme(Data(text.utf8))
+        let set = try HotlayoutThemeSet.load(Data(text.utf8))
         XCTAssertEqual(set.theme("light").spacing["md"], 12, "the built-in value of the same token")
         XCTAssertEqual(set.theme("light").spacing["hero"], 0, "the nearest bound")
     }

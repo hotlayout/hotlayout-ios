@@ -32,45 +32,37 @@ enum IconSet {
     static let gridSize = 24.0
     static let defaultStrokeWidth = 2.0
 
-    private static let lock = NSLock()
-    private static var parsed: [String: [IconElement]] = [:]
+    private static let parsed = LockedValue<[String: [IconElement]]>([:])
+
+    /// The shipped file, parsed once.
+    private static let shipped: JSONValue? = {
+        guard let url = Bundle.module.url(forResource: "icons", withExtension: "json"),
+            let data = try? Data(contentsOf: url)
+        else { return nil }
+        return try? JSONValue.parse(data)
+    }()
 
     /// The raw bodies by name, loaded once.
     static let bodies: [String: String] = {
-        guard let url = Bundle.module.url(forResource: "icons", withExtension: "json"),
-            let data = try? Data(contentsOf: url), let json = try? JSONValue.parse(data)
-        else { return [:] }
         var result: [String: String] = [:]
-        for (name, body) in json["icons"]?.objectValue ?? JSONObject() {
+        for (name, body) in shipped?["icons"]?.objectValue ?? JSONObject() {
             if let body = body.stringValue { result[name] = body }
         }
         return result
     }()
 
     /// The version of the shipped set (`iconSetVersion`).
-    static let shippedVersion: String? = {
-        guard let url = Bundle.module.url(forResource: "icons", withExtension: "json"),
-            let data = try? Data(contentsOf: url), let json = try? JSONValue.parse(data)
-        else { return nil }
-        return json["iconSetVersion"]?.stringValue
-    }()
+    static let shippedVersion: String? = shipped?["iconSetVersion"]?.stringValue
 
     static var names: [String] { bodies.keys.sorted() }
 
     /// The elements of an icon, or `nil` for a name the set does not have (`unknownIcon:
     /// 'empty-box-same-size'`: the caller keeps an empty box of the same size).
     static func elements(_ name: String) -> [IconElement]? {
-        lock.lock()
-        if let known = parsed[name] {
-            lock.unlock()
-            return known
-        }
-        lock.unlock()
+        if let known = parsed.withLock({ $0[name] }) { return known }
         guard let body = bodies[name] else { return nil }
         let elements = IconBody.parse(body)
-        lock.lock()
-        parsed[name] = elements
-        lock.unlock()
+        parsed.withLock { $0[name] = elements }
         return elements
     }
 }

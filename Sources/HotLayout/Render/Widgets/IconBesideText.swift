@@ -67,13 +67,15 @@ enum ButtonGeometry {
 
     static let sizes: [String: (block: String, inline: String, typography: String)] = [
         "sm": ("xs", "md", "bodyM"),
-        "md": ("sm", "md", "titleS"),
+        "md": defaultSize,
         "lg": ("md", "lg", "titleM"),
     ]
 
+    private static let defaultSize: (block: String, inline: String, typography: String) = ("sm", "md", "titleS")
+
     /// The size word, or `md` for no word and for a word of a newer minor.
     static func size(_ word: String?, theme: HotlayoutTheme) -> Size {
-        let entry = sizes[word ?? "md"] ?? sizes["md"]!
+        let entry = sizes[word ?? "md"] ?? defaultSize
         return Size(
             paddingBlock: theme.coreSpacing(entry.block), paddingInline: theme.coreSpacing(entry.inline),
             typography: entry.typography, paddingBlockToken: entry.block, paddingInlineToken: entry.inline

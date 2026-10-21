@@ -26,7 +26,7 @@ struct IconButtonWidget: View {
         let shape = LogicalCornersShape(corners: surface.corners ?? RoleSurface.corners(all: theme.coreRadius("pill")), rightToLeft: context.rightToLeft)
         let icon = IconBesideTextRules.resolve(props: node.props, field: "icon", scope: context.scope)
         let name = ButtonGeometry.iconButtonName(label: context.text(node, field: "label"), iconName: icon.resolved)
-        let action = node.props["action"]?.objectValue ?? ["type": "none"]
+        let action = node.props["action"]?.objectValue ?? ["type": .string(ActionType.none.rawValue)]
         let disabled = WritePress.isDisabled(
             node, scope: context.scope, screenRoot: context.form?.root, screenScope: context.form?.scope ?? context.scope, widthClass: context.widthClass)
 

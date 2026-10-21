@@ -15,6 +15,7 @@ public enum JSONValue: Equatable, Sendable {
     case array([JSONValue])
     case object(JSONObject)
 
+    /// The string, or `nil` for any other kind of value.
     public var stringValue: String? {
         if case .string(let value) = self { return value }
         return nil
@@ -27,21 +28,25 @@ public enum JSONValue: Equatable, Sendable {
         return nil
     }
 
+    /// The boolean, or `nil` for any other kind of value.
     public var boolValue: Bool? {
         if case .bool(let value) = self { return value }
         return nil
     }
 
+    /// The elements, or `nil` for any other kind of value.
     public var arrayValue: [JSONValue]? {
         if case .array(let value) = self { return value }
         return nil
     }
 
+    /// The object, or `nil` for any other kind of value.
     public var objectValue: JSONObject? {
         if case .object(let value) = self { return value }
         return nil
     }
 
+    /// Whether the value is JSON `null`.
     public var isNull: Bool {
         if case .null = self { return true }
         return false
@@ -59,6 +64,7 @@ public enum JSONValue: Equatable, Sendable {
 /// in its own order), and `JSONSerialization` loses it. A repeated key keeps its first
 /// position and takes the last value, as `JSON.parse` does.
 public struct JSONObject: Equatable, Sendable, Sequence {
+    /// The keys in the order they first appeared.
     public private(set) var keys: [String] = []
     private var storage: [String: JSONValue] = [:]
 
@@ -68,9 +74,12 @@ public struct JSONObject: Equatable, Sendable, Sequence {
         for (key, value) in pairs { self[key] = value }
     }
 
+    /// The number of keys.
     public var count: Int { keys.count }
+    /// Whether the object has no key.
     public var isEmpty: Bool { keys.isEmpty }
 
+    /// The value of a key; assigning `nil` removes the key.
     public subscript(key: String) -> JSONValue? {
         get { storage[key] }
         set {
@@ -82,6 +91,7 @@ public struct JSONObject: Equatable, Sendable, Sequence {
         }
     }
 
+    /// Iterates the pairs in key order.
     public func makeIterator() -> AnyIterator<(key: String, value: JSONValue)> {
         var index = 0
         return AnyIterator {
@@ -92,11 +102,14 @@ public struct JSONObject: Equatable, Sendable, Sequence {
         }
     }
 
+    /// Objects are equal when their keys and values are; the order of keys takes no part.
     public static func == (lhs: JSONObject, rhs: JSONObject) -> Bool {
         lhs.storage == rhs.storage
     }
 }
 
+/// Literals for building values in code. A `nil` literal is `.null`, but where the context is an
+/// `Optional<JSONValue>` it is `Optional.none`: write `.null` when you mean JSON null.
 extension JSONValue: ExpressibleByStringLiteral, ExpressibleByIntegerLiteral, ExpressibleByFloatLiteral,
     ExpressibleByBooleanLiteral, ExpressibleByNilLiteral, ExpressibleByArrayLiteral, ExpressibleByDictionaryLiteral
 {

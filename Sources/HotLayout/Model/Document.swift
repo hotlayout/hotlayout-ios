@@ -6,18 +6,25 @@ import Foundation
 /// a newer minor (or one of the wrong shape) is simply not read (`unknownStyleField:
 /// 'ignore-field'`), and the rest of the node works.
 public struct DocumentNode: Identifiable, Equatable, Sendable {
+    /// The `id` of the node; made from its position when the document gives none.
     public let id: String
+    /// The widget type as the document names it; may be one this reader does not know.
     public let type: String
+    /// The `props` of the node as the document has them.
     public let props: JSONObject
     /// Every field of the node as it lies in the document (`style`, `styleWhen`, `visibleIf`,
     /// `weight`, `fill`, …). Readers of node fields look here.
     public let fields: JSONObject
+    /// The child nodes, in document order.
     public let children: [DocumentNode]
     /// `columns` of this node came from a width-class layer (read as 1…6, not as the base's 2…4).
     let columnsFromOverride: Bool
 
+    /// The `style` of the node as the document has it.
     public var style: JSONValue? { fields["style"] }
+    /// The state styles of the node as the document has them.
     public var styleWhen: JSONValue? { fields["styleWhen"] }
+    /// The visibility condition of the node as the document has it.
     public var visibleIf: JSONValue? { fields["visibleIf"] }
 
     init(id: String, type: String, props: JSONObject = JSONObject(), fields: JSONObject = JSONObject(), children: [DocumentNode] = []) {
@@ -34,48 +41,81 @@ public struct DocumentNode: Identifiable, Equatable, Sendable {
     }
 }
 
+/// How a screen is shown.
 public enum ScreenPresentation: String, Equatable, Sendable {
     case page
     case modal
 }
 
+/// Where a modal layer lies (`modalPlacement`).
+public enum ModalPlacement: String, Equatable, Sendable {
+    case bottom
+    case center
+}
+
+/// The icons the status bar should have under a screen (`statusBarIcons`).
+public enum StatusBarIcons: String, Equatable, Sendable {
+    case light
+    case dark
+}
+
 /// An entry of `screens`: a screen and how it is shown.
 public struct ScreenEntry: Equatable, Sendable {
+    /// The identifier other screens and entry points name.
     public let screenId: String
+    /// The name of the document.
     public let name: String
+    /// Whether the screen is a page or a modal layer.
     public let presentation: ScreenPresentation
-    /// `bottom` or `center` (9.9.0); only known words are kept (`unknownModalPlacement`).
+    /// `bottom` or `center`; only known words are kept (`unknownModalPlacement`).
     public let modalPlacement: String?
+    /// `modalPlacement` as a value; `nil` for a screen that names none.
+    public var placement: ModalPlacement? { modalPlacement.flatMap(ModalPlacement.init(rawValue:)) }
     /// `light` or `dark`: the screen's request about the icons of the system status bar
     /// (`statusBarIcons`). The reader does not touch the status bar; the request goes to the
     /// host with the screen-shown event.
     public let statusBarIcons: String?
-    /// Blur radius under a modal layer, 1…40 (9.20.0); `nil` without a valid field or on a page.
+    /// `statusBarIcons` as a value; `nil` for a screen that names none.
+    public var statusBar: StatusBarIcons? { statusBarIcons.flatMap(StatusBarIcons.init(rawValue:)) }
+    /// Blur radius under a modal layer, 1…40; `nil` without a valid field or on a page.
     public let backdropBlur: Int?
-    /// `false` only for a modal layer that waits for an action inside it (9.26.0).
+    /// `false` only for a modal layer that waits for an action inside it.
     public let dismissible: Bool
+    /// The root node of the screen.
     public let root: DocumentNode
 }
 
 /// `localization` of a document: the source language, the listed languages and the
 /// translation table (`strings[locale][key]`).
 public struct DocumentLocalization: Equatable, Sendable {
+    /// The source language of the texts.
     public let defaultLocale: String
+    /// The languages the document lists.
     public let locales: [String]
+    /// The translated strings: language, then key.
     public let strings: [String: [String: String]]
 }
 
 /// A document as the reader holds it: the screens it could read and what it skipped.
 public struct HotlayoutDocument: Equatable, Sendable {
+    /// The schema version the document was written for.
     public let schemaVersion: String
+    /// The identifier of the document.
     public let documentId: String
+    /// The name of the document.
     public let name: String
+    /// The screen the flow starts on; `nil` means the first screen.
     public let initialScreenId: String?
+    /// The named entry points: public name to screen.
     public let entryPoints: [String: String]
+    /// The screens in document order.
     public let screens: [ScreenEntry]
+    /// The languages of the document; `nil` for a document without them.
     public let localization: DocumentLocalization?
+    /// What the reader skipped or replaced while reading the document.
     public let reports: [HotlayoutReport]
 
+    /// The screen with this identifier, or `nil`.
     public func screen(_ screenId: String) -> ScreenEntry? {
         screens.first { $0.screenId == screenId }
     }
@@ -96,6 +136,7 @@ public enum HotlayoutLoadError: Error, Equatable, CustomStringConvertible, Senda
     case incompatibleVersion(VersionVerdict)
     case maxDepthExceeded(screenId: String)
 
+    /// A one-line description for logs.
     public var description: String {
         switch self {
         case .malformedJSON(let reason): return "malformed JSON: \(reason)"
@@ -107,41 +148,48 @@ public enum HotlayoutLoadError: Error, Equatable, CustomStringConvertible, Senda
     }
 }
 
-/// Loads a document: JSON, the version gate, the guards, then a tolerant read of the tree.
-public func loadDocument(_ data: Data) throws -> HotlayoutDocument {
-    let json: JSONValue
-    do {
-        json = try JSONValue.parse(data)
-    } catch {
-        throw HotlayoutLoadError.malformedJSON(String(describing: error))
+extension HotlayoutDocument {
+    /// Loads a document: JSON, the version gate, the guards, then a tolerant read of the tree.
+    ///
+    /// - Throws: `HotlayoutLoadError`.
+    public static func load(_ data: Data) throws -> HotlayoutDocument {
+        let json: JSONValue
+        do {
+            json = try JSONValue.parse(data)
+        } catch {
+            throw HotlayoutLoadError.malformedJSON(String(describing: error))
+        }
+        return try load(json)
     }
-    return try loadDocument(json)
+
+    /// Loads a document from JSON that is already parsed.
+    public static func load(_ json: JSONValue) throws -> HotlayoutDocument {
+        try DocumentReader.read(json)
+    }
 }
 
-public func loadDocument(_ json: JSONValue) throws -> HotlayoutDocument {
-    try DocumentReader.read(json)
-}
+@available(*, deprecated, renamed: "HotlayoutDocument.load(_:)")
+public func loadDocument(_ data: Data) throws -> HotlayoutDocument { try HotlayoutDocument.load(data) }
+
+@available(*, deprecated, renamed: "HotlayoutDocument.load(_:)")
+public func loadDocument(_ json: JSONValue) throws -> HotlayoutDocument { try HotlayoutDocument.load(json) }
 
 /// The tolerant reader of the document tree.
 enum DocumentReader {
+    /// Widgets of the schema; any other type is an unknown widget.
+    static let knownWidgets = Set(WidgetType.allCases.map(\.rawValue))
+
     /// Levels UNDER a screen root that are drawn. A deeper tree is refused before any
     /// recursion (the legal maximum is far smaller).
     static let maxParseDepth = 32
     /// A key an open map cannot have (`protoKeyWithoutValidation: 'drop-entry'`).
     static let forbiddenKey = "__proto__"
 
-    /// Widgets of the schema (`x-compatibility.widgets`); any other type is an unknown widget.
-    static let knownWidgets: Set<String> = [
-        "Screen", "AppBar", "Column", "Row", "Container", "Grid", "Stack", "Tabs", "Tab", "Accordion",
-        "ChoiceGroup", "Repeater", "Spacer", "Divider", "Text", "Image", "Icon", "Button", "IconButton",
-        "ListTile", "ProgressBar", "CircularProgress", "Badge", "NavBar", "NavItem", "TextField", "Switch", "Checkbox",
-    ]
-
     static func read(_ raw: JSONValue) throws -> HotlayoutDocument {
         let json = withoutForbiddenKeys(raw)
         guard let object = json.objectValue else { throw HotlayoutLoadError.notADocument("the document is not an object") }
 
-        let verdict = checkDocumentVersion(json)
+        let verdict = HotlayoutVersions.checkDocument(json)
         guard verdict.isReadable else { throw HotlayoutLoadError.incompatibleVersion(verdict) }
 
         let sink = ReportSink()
@@ -214,7 +262,7 @@ enum DocumentReader {
         if let value = object["props"] {
             if let own = value.objectValue { props = own } else { sink.add(.ignoredInput, here, "props are not an object; the widget draws with its defaults") }
         }
-        if !knownWidgets.contains(type) {
+        if WidgetType(rawValue: type) == nil {
             sink.add(.unknownWidget, here, "unknown widget “\(type)”; its children are drawn")
         }
         var children: [DocumentNode] = []

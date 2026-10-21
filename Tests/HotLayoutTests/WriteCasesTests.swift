@@ -188,7 +188,7 @@ final class WriteCasesTests: XCTestCase {
                     "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a",
                     "screens": [["screenId": "a", "name": "A", "root": ["id": "r", "type": "Screen", "props": [:], "children": row["nodes"] ?? []]]],
                 ]
-                let document = try loadDocument(screen)
+                let document = try HotlayoutDocument.load(screen)
                 for locale in ["en", "ar"] {
                     let view = HotlayoutScreen(document: document, data: Contract.scope(row["session"]), locale: locale).frame(width: 360, height: 640)
                     XCTAssertNotNil(ImageRenderer(content: view).cgImage, "\(Self.name(row)) \(locale)")

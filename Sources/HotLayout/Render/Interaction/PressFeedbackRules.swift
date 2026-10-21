@@ -20,9 +20,9 @@ enum PressFeedbackRules {
     /// The kind of feedback of a node that performs the action of a press, or `nil`.
     static func kind(_ node: DocumentNode, disabled: Bool = false, swipe: Bool = false) -> Kind? {
         if node.fields["pressFeedback"]?.stringValue == offWord || disabled || swipe { return nil }
-        switch node.type {
-        case "Button": return node.props["variant"]?.stringValue == "ghost" ? .fade : .button
-        case "IconButton", "NavItem": return .fade
+        switch node.widget {
+        case .button: return node.props["variant"]?.stringValue == "ghost" ? .fade : .button
+        case .iconButton, .navItem: return .fade
         default: return .card
         }
     }

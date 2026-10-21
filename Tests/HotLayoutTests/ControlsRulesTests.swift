@@ -37,7 +37,7 @@ final class ControlsRulesTests: XCTestCase {
 
     /// Every control is drawn at the size the contract gives it, in both directions.
     func testControlsDrawAtTheirSize() throws {
-        let document = try loadDocument(Contract.json("fixtures/buttons-chips-screens.json"))
+        let document = try HotlayoutDocument.load(Contract.json("fixtures/buttons-chips-screens.json"))
         XCTAssertFalse(document.screens.isEmpty)
         for locale in ["en", "ar"] {
             let view = HotlayoutScreen(document: document, locale: locale, now: Date(timeIntervalSince1970: 1_791_000_000)).frame(width: 393, height: 852)

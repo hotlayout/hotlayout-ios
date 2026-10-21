@@ -2,10 +2,14 @@ import Foundation
 
 /// A color with alpha, components 0…1 (sRGB).
 public struct RGBA: Equatable, Hashable, Sendable {
-    public internal(set) var red: Double
-    public internal(set) var green: Double
-    public internal(set) var blue: Double
-    public internal(set) var alpha: Double
+    /// Red, 0…1.
+    public let red: Double
+    /// Green, 0…1.
+    public let green: Double
+    /// Blue, 0…1.
+    public let blue: Double
+    /// Opacity, 0…1.
+    public let alpha: Double
 
     public init(red: Double, green: Double, blue: Double, alpha: Double = 1) {
         self.red = red
@@ -29,6 +33,7 @@ public struct RGBA: Equatable, Hashable, Sendable {
         self.init(red: values[0], green: values[1], blue: values[2], alpha: values.count == 4 ? values[3] : 1)
     }
 
+    /// The color with its alpha multiplied by `opacity`.
     public func withOpacity(_ opacity: Double) -> RGBA {
         RGBA(red: red, green: green, blue: blue, alpha: alpha * opacity)
     }
@@ -37,9 +42,13 @@ public struct RGBA: Equatable, Hashable, Sendable {
 /// A text style of the theme: size and spacing in logical pixels, line height a multiple of
 /// the size (`lineHeightUnit: 'font-size-multiple'`), no letter spacing is zero.
 public struct TextStyleValue: Equatable, Sendable {
+    /// The size in logical pixels.
     public internal(set) var fontSize: Double
+    /// The line height as a multiple of the size.
     public internal(set) var lineHeight: Double
+    /// The weight, 100…900.
     public internal(set) var fontWeight: Int
+    /// The letter spacing in logical pixels.
     public internal(set) var letterSpacing: Double
     /// `heading` or `body`: which font family the style uses.
     public internal(set) var role: String
@@ -53,43 +62,75 @@ public struct TextStyleValue: Equatable, Sendable {
     }
 }
 
+/// One layer of a shadow.
 public struct ShadowLayer: Equatable, Sendable {
+    /// The horizontal offset in logical pixels.
     public internal(set) var offsetX: Double
+    /// The vertical offset in logical pixels.
     public internal(set) var offsetY: Double
+    /// The blur radius in logical pixels.
     public internal(set) var blur: Double
+    /// The spread in logical pixels.
     public internal(set) var spread: Double
+    /// The color of the layer.
     public internal(set) var color: RGBA
 }
 
+/// A linear gradient of the theme.
 public struct GradientValue: Equatable, Sendable {
+    /// A color at a position along a gradient.
     public struct Stop: Equatable, Sendable {
+        /// The color at this stop.
         public var color: RGBA
+        /// The position along the gradient, 0…1.
         public var position: Double
     }
 
     /// Degrees as CSS reads them: 0 is «to top», 90 «to right».
-    public internal(set) var angle: Double
-    public internal(set) var stops: [Stop]
+    public let angle: Double
+    /// The stops in order.
+    public let stops: [Stop]
 }
 
 /// The colors of one role (`roles.buttonVariant.primary`): names of theme colors.
 public struct RoleSlots: Equatable, Sendable {
-    public internal(set) var background: String?
-    public internal(set) var foreground: String?
-    public internal(set) var border: String?
+    /// The name of the background color.
+    public let background: String?
+    /// The name of the text and icon color.
+    public let foreground: String?
+    /// The name of the border color.
+    public let border: String?
+}
+
+/// Whether a theme is light or dark.
+public enum ThemeBrightness: String, Equatable, Sendable {
+    case light
+    case dark
 }
 
 /// One theme of a theme contract: six dictionaries and the roles.
 public struct HotlayoutTheme: Equatable, Sendable {
+    /// The identifier of the theme.
     public internal(set) var id: String
+    /// `light` or `dark`; see `appearance`.
     public internal(set) var brightness: String
+    /// `brightness` as a value; anything but `dark` reads as `light`, as the theme reader does.
+    public var appearance: ThemeBrightness { brightness == ThemeBrightness.dark.rawValue ? .dark : .light }
+    /// The spacing steps by name, in logical pixels.
     public internal(set) var spacing: [String: Double]
+    /// The corner radii by name, in logical pixels.
     public internal(set) var radius: [String: Double]
+    /// The colors by name.
     public internal(set) var color: [String: RGBA]
+    /// The text styles by name.
     public internal(set) var typography: [String: TextStyleValue]
+    /// The shadows by name.
     public internal(set) var elevation: [String: [ShadowLayer]]
+    /// The gradients by name.
     public internal(set) var gradient: [String: GradientValue]
+    /// The font families by role (`heading`, `body`).
     public internal(set) var fontFamilies: [String: String]
+    /// The color slots of the roles of the widgets (a role group, then a variant).
     public internal(set) var roles: [String: [String: RoleSlots]]
 
     /// The color behind a name, with the optional state colors falling back to the token they
@@ -132,9 +173,12 @@ public struct HotlayoutTheme: Equatable, Sendable {
 
 /// A theme contract: a set of themes and the one a reader takes by default.
 public struct HotlayoutThemeSet: Equatable, Sendable {
-    public internal(set) var themeContractVersion: String
-    public internal(set) var defaultThemeId: String
-    public internal(set) var themes: [String: HotlayoutTheme]
+    /// The version of the theme contract the set was written for.
+    public let themeContractVersion: String
+    /// The theme a reader takes when none is asked for.
+    public let defaultThemeId: String
+    /// The themes by identifier.
+    public let themes: [String: HotlayoutTheme]
     /// What the reader skipped or replaced while reading the theme (`loadTheme`); not part of
     /// equality. `HotlayoutScreen` hands these to `onReport` with its own.
     public internal(set) var reports: [HotlayoutReport] = []
@@ -169,32 +213,41 @@ public struct HotlayoutThemeSet: Equatable, Sendable {
     }
 }
 
-/// Loads a theme contract (`theme/published.json` of a project): JSON, the version gate, then a
-/// tolerant read of every theme. A token of the wrong shape is skipped and listed in `reports`
-/// of the result; the built-in theme of the same brightness fills what is missing.
-///
-/// - Throws: `HotlayoutLoadError.malformedJSON` for text that is not JSON, and
-///   `HotlayoutLoadError.notATheme` for JSON that is not a readable theme contract (no `themes`,
-///   a major version this reader does not read, or no theme that can be read). Draw with
-///   `HotlayoutThemeSet.builtIn` instead.
-public func loadTheme(_ data: Data) throws -> HotlayoutThemeSet {
-    let json: JSONValue
-    do {
-        json = try JSONValue.parse(data)
-    } catch {
-        throw HotlayoutLoadError.malformedJSON(String(describing: error))
+extension HotlayoutThemeSet {
+    /// Loads a theme contract (`theme/published.json` of a project): JSON, the version gate, then a
+    /// tolerant read of every theme. A token of the wrong shape is skipped and listed in `reports`
+    /// of the result; the built-in theme of the same brightness fills what is missing.
+    ///
+    /// - Throws: `HotlayoutLoadError.malformedJSON` for text that is not JSON, and
+    ///   `HotlayoutLoadError.notATheme` for JSON that is not a readable theme contract (no `themes`,
+    ///   a major version this reader does not read, or no theme that can be read). Draw with
+    ///   `HotlayoutThemeSet.builtIn` instead.
+    public static func load(_ data: Data) throws -> HotlayoutThemeSet {
+        let json: JSONValue
+        do {
+            json = try JSONValue.parse(data)
+        } catch {
+            throw HotlayoutLoadError.malformedJSON(String(describing: error))
+        }
+        return try load(json)
     }
-    return try loadTheme(json)
+
+    /// Loads a theme contract from JSON that is already parsed.
+    public static func load(_ json: JSONValue) throws -> HotlayoutThemeSet {
+        let sink = ReportSink()
+        guard var set = HotlayoutThemeSet.read(json, sink: sink) else {
+            throw HotlayoutLoadError.notATheme(sink.reports.first?.reason ?? "no theme can be read")
+        }
+        set.reports = sink.reports
+        return set
+    }
 }
 
-public func loadTheme(_ json: JSONValue) throws -> HotlayoutThemeSet {
-    let sink = ReportSink()
-    guard var set = HotlayoutThemeSet.read(json, sink: sink) else {
-        throw HotlayoutLoadError.notATheme(sink.reports.first?.reason ?? "no theme can be read")
-    }
-    set.reports = sink.reports
-    return set
-}
+@available(*, deprecated, renamed: "HotlayoutThemeSet.load(_:)")
+public func loadTheme(_ data: Data) throws -> HotlayoutThemeSet { try HotlayoutThemeSet.load(data) }
+
+@available(*, deprecated, renamed: "HotlayoutThemeSet.load(_:)")
+public func loadTheme(_ json: JSONValue) throws -> HotlayoutThemeSet { try HotlayoutThemeSet.load(json) }
 
 enum ThemeReader {
     static func read(_ json: JSONValue, base: HotlayoutThemeSet?, sink: ReportSink) -> HotlayoutThemeSet? {
@@ -203,7 +256,7 @@ enum ThemeReader {
             return nil
         }
         if let version = object["themeContractVersion"]?.stringValue {
-            let verdict = checkVersion(version, readerVersion: HotlayoutVersions.theme)
+            let verdict = HotlayoutVersions.check(version, readerVersion: HotlayoutVersions.theme)
             guard verdict.isReadable else {
                 sink.add(.ignoredInput, "theme", "theme contract \(version) is not readable by this reader; the built-in theme is used")
                 return nil

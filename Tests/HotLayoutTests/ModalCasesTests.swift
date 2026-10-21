@@ -219,7 +219,7 @@ final class ModalCasesTests: XCTestCase {
     static let pageScreen = JSONValue.object(JSONObject([("screenId", "a"), ("name", "A"), ("root", root)]))
 
     static func document(_ screens: [JSONValue]) throws -> HotlayoutDocument {
-        try loadDocument(.object(JSONObject([("schemaVersion", "9.27.0"), ("documentId", "d"), ("name", "n"), ("initialScreenId", "a"), ("screens", .array(screens))])))
+        try HotlayoutDocument.load(.object(JSONObject([("schemaVersion", "9.27.0"), ("documentId", "d"), ("name", "n"), ("initialScreenId", "a"), ("screens", .array(screens))])))
     }
 
     /// A page of one colour and a layer of another, drawn together off screen.

@@ -35,7 +35,7 @@ struct TemplateRun: Equatable, Sendable {
     }
 }
 
-/// Strings of a document: a literal, a binding or a template (9.4.0), and how each becomes text.
+/// Strings of a document: a literal, a binding or a template, and how each becomes text.
 enum BindableText {
     static let namePattern = "[a-z][A-Za-z0-9]{0,23}"
     private static let placeholder = try! NSRegularExpression(pattern: "\\{(\(namePattern))\\}")
@@ -48,7 +48,7 @@ enum BindableText {
         runs(value, language: language, environment: environment, sink: sink, location: location).map(\.text).joined()
     }
 
-    /// The text as runs (composed text, 9.6.0): pieces in the logical order of the shown string.
+    /// The text as runs (composed text): pieces in the logical order of the shown string.
     static func runs(
         _ value: JSONValue?, language: TemplateLanguage, environment: TextEnvironment, sink: ReportSink? = nil, location: String = "text"
     ) -> [TemplateRun] {
@@ -181,12 +181,14 @@ enum BindableText {
         let entry = values[name]
         switch kind(entry) {
         case .binding:
-            return boundPieces(entry!.objectValue!, environment: environment)
+            guard let binding = entry?.objectValue else { return [] }
+            return boundPieces(binding, environment: environment)
         case .word:
             let own = entry?["text"]?.stringValue ?? ""
             return [FormattedPiece((language.showsSource ? nil : language.translated("values.\(name).text")) ?? own)]
         case .plural:
-            return [FormattedPiece(pluralText(name, entry: entry!.objectValue!, values: values, language: language, environment: environment))]
+            guard let plural = entry?.objectValue else { return [] }
+            return [FormattedPiece(pluralText(name, entry: plural, values: values, language: language, environment: environment))]
         case nil:
             let known = ["binding", "plural", "text"].contains(entry?["kind"]?.stringValue ?? "")
             let reason: String
@@ -224,7 +226,7 @@ enum BindableText {
         }
         // The number comes only from a BINDING of the same template (`pluralWithoutNumber`).
         guard let target = entry["of"]?.stringValue, let binding = values[target], kind(binding) == .binding,
-            let count = countOf(binding.objectValue!, environment: environment)
+            let bindingObject = binding.objectValue, let count = countOf(bindingObject, environment: environment)
         else { return other }
         return forms[PluralRules.category(of: count, locale: rulesLocale)] ?? other
     }

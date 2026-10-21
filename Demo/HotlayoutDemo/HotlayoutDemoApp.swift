@@ -70,14 +70,14 @@ enum Fixtures {
             object["initialScreenId"] = .string(screenId)
             json = .object(object)
         }
-        return try loadDocument(json)
+        return try HotlayoutDocument.load(json)
     }
 
     /// The fixture's own theme (`themes/<name>-theme.json` without the `-screens` suffix), if any.
     static func theme(_ name: String) -> HotlayoutThemeSet {
         let base = name.replacingOccurrences(of: "-screens", with: "")
         guard let url = folder?.appendingPathComponent("themes/\(base)-theme.json"),
-            let data = try? Data(contentsOf: url), let set = try? loadTheme(data)
+            let data = try? Data(contentsOf: url), let set = try? HotlayoutThemeSet.load(data)
         else { return .builtIn }
         return set
     }

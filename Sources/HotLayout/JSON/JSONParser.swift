@@ -3,8 +3,11 @@ import Foundation
 /// Errors of `JSONValue.parse`. The reader never shows them to the end user; the host gets
 /// them through `HotlayoutLoadError` and decides what to draw instead.
 public struct JSONParseError: Error, Equatable, CustomStringConvertible, Sendable {
+    /// The byte offset of the error in the input.
     public let offset: Int
+    /// What is wrong, in a few words.
     public let reason: String
+    /// `JSON: reason at byte offset`.
     public var description: String { "JSON: \(reason) at byte \(offset)" }
 }
 
@@ -14,7 +17,10 @@ extension JSONValue {
     /// the stack.
     static let maxParseDepth = 256
 
-    /// Parses JSON text. Strict about syntax (a broken payload is a load error, not a guess),
+    /// Parses JSON text. Hand-written instead of `JSONSerialization` because the contract needs
+    /// what that does not give: the order of object keys is kept, a repeated key takes the last
+    /// value as `JSON.parse` does, and the nesting depth is checked before any recursion, so a
+    /// hostile payload cannot exhaust the stack. Strict about syntax (a broken payload is a load error, not a guess),
     /// lenient about nothing else: shapes are judged later, piece by piece.
     public static func parse(_ data: Data) throws -> JSONValue {
         var parser = Parser(bytes: [UInt8](data))
@@ -25,6 +31,7 @@ extension JSONValue {
         return value
     }
 
+    /// Parses JSON text; see `parse(_:)` for `Data`.
     public static func parse(_ text: String) throws -> JSONValue {
         try parse(Data(text.utf8))
     }

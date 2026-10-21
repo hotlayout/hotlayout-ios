@@ -34,7 +34,7 @@ struct TabsWidget: View {
     private var theme: HotlayoutTheme { context.theme }
 
     var body: some View {
-        let declared = node.children.filter { $0.type == "Tab" }
+        let declared = node.children.filter { $0.widget == .tab }
         let visible = declared.map { context.isShown($0) }
         let tabs = zip(declared, visible).filter(\.1).map(\.0)
         if tabs.isEmpty {

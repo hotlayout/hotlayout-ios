@@ -44,15 +44,10 @@ enum InputRules {
     static let minLines = 1
     static let maxLines = 8
 
-    private static func whole(_ value: JSONValue?) -> Int? {
-        guard let number = value?.numberValue, number == number.rounded(), abs(number) < 1e15 else { return nil }
-        return Int(number)
-    }
-
     /// Cuts typed text to the limit in code points. A limit that is not a whole number above
     /// zero means no limit. A surrogate pair is never split; a composed character may be.
     static func clamp(_ text: String, maxLength: JSONValue?) -> String {
-        guard let limit = whole(maxLength), limit >= 1 else { return text }
+        guard let limit = ContractShapes.wholeNumber(maxLength, below: 1e15), limit >= 1 else { return text }
         let scalars = text.unicodeScalars
         if scalars.count <= limit { return text }
         var result = String.UnicodeScalarView()
@@ -62,7 +57,7 @@ enum InputRules {
 
     /// How many lines the field has: a whole number within bounds is itself, otherwise one.
     static func lines(_ value: JSONValue?) -> Int {
-        guard let count = whole(value), count >= minLines, count <= maxLines else { return 1 }
+        guard let count = ContractShapes.wholeNumber(value, below: 1e15), count >= minLines, count <= maxLines else { return 1 }
         return count
     }
 

@@ -289,7 +289,7 @@ final class ListsCasesTests: XCTestCase {
                 ],
             ],
         ]
-        let document = try loadDocument(json)
+        let document = try HotlayoutDocument.load(json)
         let data: DataScope = ["items": [["name": "Alpha", "day": "Today"], ["name": "Beta", "day": "Today"], ["name": "Gamma", "day": "Mon"]]]
         let view = HotlayoutScreen(document: document, data: data, locale: "en").frame(width: 393, height: 852)
         XCTAssertNotNil(ImageRenderer(content: view).cgImage)

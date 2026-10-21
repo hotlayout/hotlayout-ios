@@ -16,7 +16,7 @@ final class HostWiringTests: XCTestCase {
     }
 
     func document(_ screens: [(String, [JSONValue])]) throws -> HotlayoutDocument {
-        try loadDocument([
+        try HotlayoutDocument.load([
             "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": .string(screens[0].0),
             "screens": .array(screens.map { id, children in
                 ["screenId": .string(id), "name": .string(id), "root": ["id": .string("root-\(id)"), "type": "Screen", "props": [:], "children": .array(children)]]
@@ -187,7 +187,7 @@ final class KnownWidgetsDrawnTests: XCTestCase {
             let inner = parents.filter { $0.value == type }.map { node($0.key) }
             children.append(node(type, inner))
         }
-        let document = try loadDocument([
+        let document = try HotlayoutDocument.load([
             "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a",
             "screens": [["screenId": "a", "name": "A", "root": ["id": "r", "type": "Screen", "props": [:], "children": .array(children)]]],
         ])

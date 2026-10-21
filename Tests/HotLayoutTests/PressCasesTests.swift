@@ -238,7 +238,7 @@ final class PressCasesTests: XCTestCase {
     }
 
     func testDeliveryOrderIsHapticTrackAction() throws {
-        var flow = Flow(document: FlowDocument(try loadDocument(.object(JSONObject([
+        var flow = Flow(document: FlowDocument(try HotlayoutDocument.load(.object(JSONObject([
             ("schemaVersion", "9.27.0"), ("documentId", "d"), ("name", "n"), ("initialScreenId", "a"),
             ("screens", [.object(JSONObject([("screenId", "a"), ("name", "A"), ("root", .object(JSONObject([("id", "r"), ("type", "Screen"), ("props", .object(JSONObject())), ("children", [])])))]))]),
         ])))), entry: nil)

@@ -101,7 +101,7 @@ struct ScreenRootView: View {
     @ViewBuilder
     private func barZone(_ plan: Plan, inner: RenderContext) -> some View {
         if let bar = plan.bar {
-            let view = NodeView(node: bar, context: barContext(inner, plan), placement: .stretched, depth: 1, parentType: "Screen")
+            let view = NodeView(node: bar, context: barContext(inner, plan), placement: .stretched, depth: 1, parentType: WidgetType.screen.rawValue)
                 .background(
                     GeometryReader { proxy in
                         Color.clear.onAppear { barHeight = Double(proxy.size.height) }.onChange(of: proxy.size.height) { barHeight = Double($0) }
@@ -194,7 +194,7 @@ struct ScreenRootView: View {
         if let nav = plan.topNav {
             NodeView(
                 node: nav, context: navContext(inner, floats: false, atTop: true, contentMax: plan.contentMax), placement: .stretched, depth: 1,
-                parentType: "Screen"
+                parentType: WidgetType.screen.rawValue
             )
             .layoutValue(key: ScreenZoneKey.self, value: .topNav)
         }
@@ -205,7 +205,7 @@ struct ScreenRootView: View {
         if let nav = plan.nav {
             NodeView(
                 node: nav, context: navContext(inner, floats: plan.floats, atTop: false, contentMax: plan.contentMax), placement: .stretched, depth: 1,
-                parentType: "Screen"
+                parentType: WidgetType.screen.rawValue
             )
             .modifier(ZoneHeightReporter(active: plan.floats, extra: insets.bottom))
             .layoutValue(key: ScreenZoneKey.self, value: .nav)
@@ -304,7 +304,7 @@ private struct Plan {
         let visibleBody = parts.body.filter { shown($0) != nil }
         let firstPull =
             visibleBody.first.flatMap { child in
-                FlowPull.read(node: child, parentType: "Screen", parentProps: root.props).flatMap { context.resolver.spacing($0.by.json) }
+                FlowPull.read(node: child, parentType: WidgetType.screen.rawValue, parentProps: root.props).flatMap { context.resolver.spacing($0.by.json) }
             } ?? 0
         self.bar = barShown
         self.topPinned = parts.topPinned.filter { shown($0) != nil }

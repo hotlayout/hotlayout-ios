@@ -1,6 +1,6 @@
 import Foundation
 
-/// Which language a document is shown in (schema 9.1.0).
+/// Which language a document is shown in.
 ///
 /// The host passes the DEVICE locale (`ar-EG`, `pt_BR`); the document has translations under
 /// short codes. The contract's policy rows:
@@ -91,50 +91,48 @@ enum LocaleTags {
     }
 }
 
-/// Whether an anchored expression matches the WHOLE string. ICU's `$` also matches before a
-/// final line feed, JavaScript's does not; the contract's expressions are JavaScript's, so the
-/// match must cover every character.
-func matches(_ expression: NSRegularExpression, _ text: String) -> Bool {
-    let whole = NSRange(text.startIndex..., in: text)
-    guard let match = expression.firstMatch(in: text, range: whole) else { return false }
-    return match.range == whole
+extension LocaleResolution {
+    /// Which language a document is shown in when the host asks for `requested`.
+    ///
+    /// - Parameters:
+    ///   - requested: the locale of the user, as the platform gives it.
+    ///   - available: the document's `localization.locales`.
+    ///   - source: the document's `localization.defaultLocale`; `nil` — no localization.
+    public static func resolve(_ requested: String?, available: [String], source: String?) -> LocaleResolution {
+        let asked = LocaleTags.normalize(requested)
+        let askedFormat = LocaleTags.wellFormedTag(asked)
+
+        guard let source else {
+            return LocaleResolution(translation: nil, formatting: askedFormat, directionLocale: askedFormat ?? asked, matched: false)
+        }
+        func canonical(_ locale: String) -> String { LocaleTags.normalize(locale) ?? locale }
+        let unmatched = LocaleResolution(
+            translation: source,
+            formatting: LocaleTags.wellFormedTag(LocaleTags.normalize(source)) ?? canonical(source),
+            directionLocale: canonical(source),
+            matched: false
+        )
+        guard let asked else { return unmatched }
+
+        // Comparison key → the DOCUMENT's spelling; the first in the list wins over a case twin.
+        var keys: [String: String] = [:]
+        for locale in available + [source] {
+            if let key = LocaleTags.normalize(locale)?.lowercased(), keys[key] == nil { keys[key] = locale }
+        }
+        for candidate in LocaleTags.lookupChain(asked) {
+            if let found = keys[candidate.lowercased()] {
+                let shown = canonical(found)
+                return LocaleResolution(
+                    translation: found, formatting: askedFormat ?? LocaleTags.wellFormedTag(shown) ?? shown, directionLocale: shown, matched: true)
+            }
+        }
+        return unmatched
+    }
 }
 
-/// Which language a document is shown in when the host asks for `requested`.
-///
-/// - Parameters:
-///   - requested: the locale of the user, as the platform gives it.
-///   - available: the document's `localization.locales`.
-///   - source: the document's `localization.defaultLocale`; `nil` — no localization.
+@available(*, deprecated, renamed: "LocaleResolution.resolve(_:available:source:)")
 public func resolveLocale(_ requested: String?, available: [String], source: String?) -> LocaleResolution {
-    let asked = LocaleTags.normalize(requested)
-    let askedFormat = LocaleTags.wellFormedTag(asked)
-
-    guard let source else {
-        return LocaleResolution(translation: nil, formatting: askedFormat, directionLocale: askedFormat ?? asked, matched: false)
-    }
-    func canonical(_ locale: String) -> String { LocaleTags.normalize(locale) ?? locale }
-    let unmatched = LocaleResolution(
-        translation: source,
-        formatting: LocaleTags.wellFormedTag(LocaleTags.normalize(source)) ?? canonical(source),
-        directionLocale: canonical(source),
-        matched: false
-    )
-    guard let asked else { return unmatched }
-
-    // Comparison key → the DOCUMENT's spelling; the first in the list wins over a case twin.
-    var keys: [String: String] = [:]
-    for locale in available + [source] {
-        if let key = LocaleTags.normalize(locale)?.lowercased(), keys[key] == nil { keys[key] = locale }
-    }
-    for candidate in LocaleTags.lookupChain(asked) {
-        if let found = keys[candidate.lowercased()] {
-            let shown = canonical(found)
-            return LocaleResolution(
-                translation: found, formatting: askedFormat ?? LocaleTags.wellFormedTag(shown) ?? shown, directionLocale: shown, matched: true)
-        }
-    }
-    return unmatched
+    LocaleResolution.resolve(requested, available: available, source: source)
 }
 
 /// Writing direction of a language from platform locale data (CLDR), not from a list of our

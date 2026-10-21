@@ -417,7 +417,7 @@ final class InputCasesTests: XCTestCase {
                     "schemaVersion": "9.27.0", "documentId": "d", "name": "n", "initialScreenId": "a",
                     "screens": [["screenId": "a", "name": "A", "root": ["id": "r", "type": "Screen", "props": [:], "children": [node]]]],
                 ]
-                guard let document = try? loadDocument(screen) else { continue }
+                guard let document = try? HotlayoutDocument.load(screen) else { continue }
                 for locale in ["en", "ar"] {
                     let view = HotlayoutScreen(document: document, data: ["form.email": "a@b.c", "settings.notifications": true], locale: locale).frame(width: 320, height: 480)
                     XCTAssertNotNil(ImageRenderer(content: view).cgImage, "\(Self.name(row)) \(locale)")

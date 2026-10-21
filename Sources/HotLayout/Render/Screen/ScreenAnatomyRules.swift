@@ -136,12 +136,12 @@ enum ScreenAnatomy {
 
     /// The app bar zone: the first child of the root by the DOCUMENT, if it is an `AppBar`.
     static func appBarOf(_ children: [DocumentNode]) -> DocumentNode? {
-        children.first?.type == "AppBar" ? children.first : nil
+        children.first?.widget == .appBar ? children.first : nil
     }
 
     /// The navigation bar: the last child of the root, if it is a `NavBar`.
     static func navBarOf(_ children: [DocumentNode]) -> DocumentNode? {
-        children.last?.type == "NavBar" ? children.last : nil
+        children.last?.widget == .navBar ? children.last : nil
     }
 
     /// The pinned block: the last child of the root not counting the navigation bar, if its
@@ -151,8 +151,8 @@ enum ScreenAnatomy {
         let index = end - 1
         guard index >= 0, index < children.count else { return nil }
         let candidate = children[index]
-        if pinOf(candidate) != bottomPin || candidate.type == "NavBar" { return nil }
-        if index == 0, candidate.type == "AppBar" { return nil }
+        if pinOf(candidate) != bottomPin || candidate.widget == .navBar { return nil }
+        if index == 0, candidate.widget == .appBar { return nil }
         return candidate
     }
 
@@ -161,8 +161,8 @@ enum ScreenAnatomy {
     static func topPinnedOf(_ children: [DocumentNode], rootProps: JSONObject) -> [DocumentNode] {
         if bodyTopWord(rootProps["bodyTop"]) != nil { return [] }
         var run: [DocumentNode] = []
-        for child in children.dropFirst(children.first?.type == "AppBar" ? 1 : 0) {
-            if !topPinOf(child) || child.type == "AppBar" || child.type == "NavBar" { break }
+        for child in children.dropFirst(children.first?.widget == .appBar ? 1 : 0) {
+            if !topPinOf(child) || child.widget == .appBar || child.widget == .navBar { break }
             run.append(child)
         }
         return run

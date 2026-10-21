@@ -31,9 +31,9 @@ enum CarouselRules {
     /// A row that scrolls, or a data list laid out in a row. A list with `columns` does not read
     /// its direction at all, so it is never a carousel. Props decide, not the type alone.
     static func isHost(type: String, props: JSONObject) -> Bool {
-        switch type {
-        case "Row": return props["scrollable"]?.boolValue == true
-        case "Repeater": return props["direction"]?.stringValue == "row" && RepeaterPlan.columns(props) == nil
+        switch WidgetType(type) {
+        case .row: return props["scrollable"]?.boolValue == true
+        case .repeater: return props["direction"]?.stringValue == "row" && RepeaterPlan.columns(props) == nil
         default: return false
         }
     }

@@ -19,8 +19,7 @@ enum InputPartsRules {
     static let quietColor = "muted"
 
     private static func whole(_ value: JSONValue?, in range: ClosedRange<Int>) -> Int? {
-        guard let number = value?.numberValue, number == number.rounded(), abs(number) < 1e15 else { return nil }
-        guard let integer = Int(exactly: number) else { return nil }
+        guard let integer = ContractShapes.wholeNumber(value, below: 1e15) else { return nil }
         return range.contains(integer) ? integer : nil
     }
 

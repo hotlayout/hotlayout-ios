@@ -53,7 +53,7 @@ enum NavBarRules {
 
     /// The target of a `navigate.section` action: a non-empty `screenId` parameter.
     static func sectionTarget(_ action: JSONObject?) -> String? {
-        guard action?["type"]?.stringValue == "navigate.section", let target = action?["params"]?["screenId"]?.stringValue, !target.isEmpty else { return nil }
+        guard ActionType(action?["type"]?.stringValue) == .navigateSection, let target = action?["params"]?["screenId"]?.stringValue, !target.isEmpty else { return nil }
         return target
     }
 

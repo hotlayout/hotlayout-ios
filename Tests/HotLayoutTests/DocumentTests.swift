@@ -10,21 +10,21 @@ final class DocumentTests: XCTestCase {
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter { $0.pathExtension == "json" }
         XCTAssertGreaterThan(files.count, 30)
         for file in files {
-            let document = try loadDocument(Data(contentsOf: file))
+            let document = try HotlayoutDocument.load(Data(contentsOf: file))
             XCTAssertFalse(document.screens.isEmpty, file.lastPathComponent)
             XCTAssertFalse(document.reports.contains { $0.kind == .unknownWidget }, "\(file.lastPathComponent): \(document.reports)")
         }
     }
 
     func testVersionGate() {
-        XCTAssertEqual(checkVersion("9.0.0"), .compatible)
-        XCTAssertEqual(checkVersion("9.27.5"), .compatible)
-        XCTAssertEqual(checkVersion("9.99.0"), .newerMinor(documentVersion: "9.99.0"))
-        XCTAssertFalse(checkVersion("10.0.0").isReadable)
-        XCTAssertFalse(checkVersion("8.20.0").isReadable)
-        XCTAssertFalse(checkVersion("9.1").isReadable)
-        XCTAssertFalse(checkVersion("+9.1.0").isReadable)
-        XCTAssertThrowsError(try loadDocument(Data(#"{"schemaVersion":"10.0.0","screens":[]}"#.utf8)))
+        XCTAssertEqual(HotlayoutVersions.check("9.0.0"), .compatible)
+        XCTAssertEqual(HotlayoutVersions.check("9.27.5"), .compatible)
+        XCTAssertEqual(HotlayoutVersions.check("9.99.0"), .newerMinor(documentVersion: "9.99.0"))
+        XCTAssertFalse(HotlayoutVersions.check("10.0.0").isReadable)
+        XCTAssertFalse(HotlayoutVersions.check("8.20.0").isReadable)
+        XCTAssertFalse(HotlayoutVersions.check("9.1").isReadable)
+        XCTAssertFalse(HotlayoutVersions.check("+9.1.0").isReadable)
+        XCTAssertThrowsError(try HotlayoutDocument.load(Data(#"{"schemaVersion":"10.0.0","screens":[]}"#.utf8)))
     }
 
     func testPiecesOfTheWrongShapeAreReportedNotFatal() throws {
@@ -34,7 +34,7 @@ final class DocumentTests: XCTestCase {
          "screens":[{"screenId":"a","name":"A","root":{"id":"r","type":"Screen","props":{"gap":"sm"},
            "children":[42,{"id":"x"},{"id":"w","type":"FancyWidget","props":{},"children":[{"id":"t","type":"Text","props":"oops"}]}]}}]}
         """#
-        let document = try loadDocument(Data(json.utf8))
+        let document = try HotlayoutDocument.load(Data(json.utf8))
         let root = document.screens[0].root
         XCTAssertEqual(root.children.map(\.id), ["w"])
         XCTAssertEqual(root.children[0].children.map(\.type), ["Text"])
@@ -47,7 +47,7 @@ final class DocumentTests: XCTestCase {
         var node = #"{"id":"leaf","type":"Text","props":{}}"#
         for level in 0..<40 { node = #"{"id":"c\#(level)","type":"Column","props":{},"children":[\#(node)]}"# }
         let json = #"{"schemaVersion":"9.27.0","documentId":"d","name":"n","initialScreenId":"a","screens":[{"screenId":"a","name":"A","root":\#(node)}]}"#
-        XCTAssertThrowsError(try loadDocument(Data(json.utf8))) { error in
+        XCTAssertThrowsError(try HotlayoutDocument.load(Data(json.utf8))) { error in
             XCTAssertEqual(error as? HotlayoutLoadError, .maxDepthExceeded(screenId: "a"))
         }
     }

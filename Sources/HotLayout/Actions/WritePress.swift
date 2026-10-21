@@ -25,7 +25,7 @@ enum WritePress {
     /// its screen, or a `disabledIf` that holds. Other nodes are never disabled.
     static func isDisabled(_ node: DocumentNode, scope: DataScope, screenRoot: DocumentNode?, screenScope: DataScope, widthClass: WidthClass = .compact) -> Bool
     {
-        guard node.type == "Button" || node.type == "IconButton" else { return false }
+        guard node.widget == .button || node.widget == .iconButton else { return false }
         return FormRules.isPressDisabled(
             requiresFilled: InputRules.isLiteralTrue(node.props["requiresFilled"]),
             disabledIf: node.props["disabledIf"],

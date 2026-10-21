@@ -4,34 +4,34 @@ import Foundation
 /// (`x-longPress`): the rules that need no view, so that the shared tables can drive them.
 enum PressTarget {
     /// The widgets that hold children and take the field `action` (and `longPress`).
-    static let containerTypes: Set<String> = ["Column", "Row", "Container", "Stack"]
+    static let containerTypes: Set<WidgetType> = [.column, .row, .container, .stack]
     /// Widgets whose own part is a control: the strip of the tabs, the header of an accordion.
-    static let ownControlWidgets: Set<String> = ["Tabs", "Accordion"]
+    static let ownControlWidgets: Set<WidgetType> = [.tabs, .accordion]
     /// Widgets whose own text is the text of their control, which does not name a card around.
-    static let ownControlTextWidgets: Set<String> = ["Accordion", "Tab"]
+    static let ownControlTextWidgets: Set<WidgetType> = [.accordion, .tab]
     /// Widgets that take the press as inputs (`input-value` fields).
-    static let inputWidgets: Set<String> = ["TextField", "Switch", "Checkbox"]
+    static let inputWidgets: Set<WidgetType> = [.textField, .switch, .checkbox]
     /// Widgets that take the field `action` without holding children: the leaves that are buttons.
-    static let actionLeaves: Set<String> = ["Button", "IconButton", "NavItem", "ListTile"]
+    static let actionLeaves: Set<WidgetType> = [.button, .iconButton, .navItem, .listTile]
 
     /// An action does something: a type that is not `none`, or `none` with `track`.
     static func acts(_ action: JSONObject) -> Bool {
         guard let type = action["type"]?.stringValue else { return false }
-        return type != "none" || !(action["track"]?.isNull ?? true)
+        return ActionType(type) != ActionType.none || !(action["track"]?.isNull ?? true)
     }
 
     // MARK: Press
 
     /// The action of a pressable container, or `nil` when the node is no such control.
     static func pressAction(_ node: DocumentNode) -> JSONObject? {
-        guard containerTypes.contains(node.type), let action = node.props["action"]?.objectValue, acts(action) else { return nil }
+        guard containerTypes.contains(node.widget), let action = node.props["action"]?.objectValue, acts(action) else { return nil }
         return action
     }
 
     /// The action a node takes on a press: a pressable container, or a list row with an action
     /// (a choice option is not a button of its own).
     static func press(of node: DocumentNode) -> JSONObject? {
-        guard node.type == "ListTile" else { return pressAction(node) }
+        guard node.widget == .listTile else { return pressAction(node) }
         // An option row belongs to its choice: its press selects, its action is not run.
         guard !isChoiceOption(node), let action = node.props["action"]?.objectValue, acts(action) else { return nil }
         return action
@@ -49,40 +49,40 @@ enum PressTarget {
     /// Whether the widget accepts the field `longPress` at all (a button, an icon button and a
     /// navigation item have one action; a text has none).
     static func acceptsLongPress(_ type: String) -> Bool {
-        containerTypes.contains(type) || type == "ListTile"
+        containerTypes.contains(WidgetType(type)) || WidgetType(type) == .listTile
     }
 
     /// A container made a control by its action or by its long press.
     static func isPressHost(_ node: DocumentNode) -> Bool {
-        pressAction(node) != nil || (containerTypes.contains(node.type) && longPress(node) != nil)
+        pressAction(node) != nil || (containerTypes.contains(node.widget) && longPress(node) != nil)
     }
 
     /// The `value` of a choice option: a list row whose trailing slot is a radio.
     static func isChoiceOption(_ node: DocumentNode) -> Bool {
-        node.type == "ListTile" && node.props["trailing"]?["kind"]?.stringValue == "radio"
+        node.widget == .listTile && node.props["trailing"]?["kind"]?.stringValue == "radio"
     }
 
     /// Whether the node takes the press for itself, so that the cards around get nothing.
     static func ownsPress(_ node: DocumentNode) -> Bool {
-        if containerTypes.contains(node.type) { return isPressHost(node) }
-        if ownControlWidgets.contains(node.type) { return true }
-        if isChoiceOption(node) || inputWidgets.contains(node.type) { return true }
+        if containerTypes.contains(node.widget) { return isPressHost(node) }
+        if ownControlWidgets.contains(node.widget) { return true }
+        if isChoiceOption(node) || inputWidgets.contains(node.widget) { return true }
         return hasActionField(node) || longPress(node) != nil
     }
 
     private static func hasActionField(_ node: DocumentNode) -> Bool {
-        actionLeaves.contains(node.type) && node.props["action"]?.objectValue != nil
+        actionLeaves.contains(node.widget) && node.props["action"]?.objectValue != nil
     }
 
     /// Whether the node is a button on a finished screen (role and name from its content).
     static func actsOnPress(_ node: DocumentNode) -> Bool {
-        if containerTypes.contains(node.type) { return isPressHost(node) }
+        if containerTypes.contains(node.widget) { return isPressHost(node) }
         return hasActionField(node) || longPress(node) != nil
     }
 
     /// A widget with an own control takes the press in its own part only, not in its children.
     private static func ownsOnlyItsBox(_ node: DocumentNode) -> Bool {
-        ownControlWidgets.contains(node.type) && !isPressHost(node)
+        ownControlWidgets.contains(node.widget) && !isPressHost(node)
     }
 
     /// The node that takes a press at a point: the innermost control of the chain from the root
@@ -102,8 +102,8 @@ enum PressTarget {
     // MARK: Name
 
     /// Fields of a widget that say something to a person; they name a card around them.
-    private static let heardFields: [String: [String]] = [
-        "Text": ["content"], "Badge": ["label"], "ListTile": ["title", "subtitle"], "Image": ["alt"], "Icon": ["alt"],
+    private static let heardFields: [WidgetType: [String]] = [
+        .text: ["content"], .badge: ["label"], .listTile: ["title", "subtitle"], .image: ["alt"], .icon: ["alt"],
     ]
 
     /// The accessible name of a pressable container: its `label` first, then the texts of its
@@ -135,14 +135,14 @@ enum PressTarget {
         for node in nodes {
             if !shown(node) { continue }
             if ownsPress(node), !ownsOnlyItsBox(node) { continue }
-            if node.type == "Repeater" { continue }
+            if node.widget == .repeater { continue }
             let chain = above + [node]
             let paint = paintOf(chain)
             if let paint, paint.opacityIsZero { continue }
             // A picture is painted with no text colour: a transparent colour does not silence its description.
-            let silent = paint.map { node.type == "Image" ? false : SilentText.paintsNothing($0) } ?? false
-            if !ownControlTextWidgets.contains(node.type), !silent {
-                for field in heardFields[node.type] ?? [] where node.props[field] != nil {
+            let silent = paint.map { node.widget == .image ? false : SilentText.paintsNothing($0) } ?? false
+            if !ownControlTextWidgets.contains(node.widget), !silent {
+                for field in (node.widget.flatMap { heardFields[$0] } ?? []) where node.props[field] != nil {
                     // A description (`alt`) may be a plain string, a title is always a bindable one.
                     let value = ShownText.of(node.props[field]?.stringValue ?? text(node, field))
                     if !TextHeard.isSilent(value) { parts.append(value) }

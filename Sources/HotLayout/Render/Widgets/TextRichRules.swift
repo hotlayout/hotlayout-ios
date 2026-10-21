@@ -4,7 +4,7 @@ import Foundation
 // here is a plain function of document values and numbers, so the shared case tables run
 // against it without a view; the SwiftUI drawing is in `TextRichWidget.swift`.
 
-// MARK: - Emphasis (9.17.0)
+// MARK: - Emphasis
 
 /// The slant and the line of a text at a point of the tree: both words are resolved. The root
 /// is `normal` and `none`.
@@ -60,7 +60,7 @@ enum TextEmphasisRules {
     }
 }
 
-// MARK: - Composed text (9.6.0, parts 9.19.0)
+// MARK: - Composed text
 
 /// The own style of a part of a text. A `nil` field is «not named»: it stays as the text has it.
 struct TextSpanStyle: Equatable {
@@ -110,16 +110,11 @@ struct TextSpanRun: Equatable {
 }
 
 enum TextSpans {
-    private static let tokenName = try! NSRegularExpression(pattern: "^[a-z][a-zA-Z0-9]{0,39}$")
     private static let placeName = try! NSRegularExpression(pattern: "^\(BindableText.namePattern)$")
     private static let hexColor = try! NSRegularExpression(pattern: "^#[0-9a-fA-F]{6}$")
 
-    private static func matches(_ expression: NSRegularExpression, _ text: String) -> Bool {
-        expression.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil
-    }
-
     private static func isTokenName(_ value: JSONValue?) -> Bool {
-        value?.stringValue.map { matches(tokenName, $0) } ?? false
+        value?.stringValue.map(ContractShapes.isTokenName) ?? false
     }
 
     /// A readable colour reference by SHAPE (whether the theme has the token is another question).
@@ -262,7 +257,7 @@ enum RichText {
     }
 }
 
-// MARK: - List marker (9.17.0)
+// MARK: - List marker
 
 enum DrawnMarker: Equatable {
     case bullet, number
@@ -378,14 +373,14 @@ enum ListMarkerRules {
     }
 }
 
-// MARK: - Gradient on glyphs (9.23.0)
+// MARK: - Gradient on glyphs
 
 enum TextGradientRules {
     /// The gradient reference that paints the letters of a node: `Text` only, from its own
     /// effective style (the field is not inherited). The reference is still to be resolved by the
     /// theme: an unknown token or stops out of order give the colour.
     static func reference(type: String, style: JSONObject) -> JSONValue? {
-        guard type == "Text", let value = style["textGradient"], !value.isNull else { return nil }
+        guard WidgetType(type) == .text, let value = style["textGradient"], !value.isNull else { return nil }
         return value
     }
 

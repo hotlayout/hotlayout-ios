@@ -26,7 +26,7 @@ struct TextEnvironment: Sendable {
     }
 }
 
-/// A part of a formatted number that a text span may style (9.19.0).
+/// A part of a formatted number that a text span may style.
 enum FormatPart: String, Sendable {
     case fraction, currency
 }
@@ -131,7 +131,7 @@ enum BindingFormat {
     }
 }
 
-/// Money as money (9.19.0, `x-money`) and the compact number (9.23.0, `x-compactNumber`):
+/// Money as money (`x-money`) and the compact number (`x-compactNumber`):
 /// the pieces of `number` and `currency`.
 enum MoneyFormat {
     static let symbols: [String: String] = [
@@ -218,10 +218,10 @@ enum MoneyFormat {
 enum CompactNumber {
     enum Step: String { case thousand, million, billion }
     static let steps: [(Step, Double)] = [(.thousand, 1_000), (.million, 1_000_000), (.billion, 1_000_000_000)]
-    static let suffixes: [String: (gap: String, thousand: String, million: String, billion: String)] = [
-        "en": ("", "K", "M", "B"),
-        "uk": ("\u{00A0}", "тис.", "млн", "млрд"),
-    ]
+    typealias Suffixes = (gap: String, thousand: String, million: String, billion: String)
+    private static let english: Suffixes = ("", "K", "M", "B")
+    private static let ukrainian: Suffixes = ("\u{00A0}", "тис.", "млн", "млрд")
+    static let suffixes: [String: Suffixes] = ["en": english, "uk": ukrainian]
 
     static func parts(of value: Double) -> (mantissa: Double, step: Step)? {
         let magnitude = abs(value)
@@ -241,7 +241,7 @@ enum CompactNumber {
 
     static func suffix(_ step: Step, locale: String?) -> String {
         let language = (locale ?? "en").split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map { $0.lowercased() } ?? "en"
-        let table = suffixes[language == "uk" ? "uk" : "en"]!
+        let table = language == "uk" ? ukrainian : english
         switch step {
         case .thousand: return table.gap + table.thousand
         case .million: return table.gap + table.million

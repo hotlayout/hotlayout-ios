@@ -26,9 +26,9 @@ struct StackView: View {
     /// container, column or stack that holds one and names no width itself.
     static func takesPlace(_ node: DocumentNode) -> Bool {
         guard node.fields["style"]?["width"] == nil else { return false }
-        switch node.type {
-        case "Image": return true
-        case "Container", "Column", "Stack":
+        switch node.widget {
+        case .image: return true
+        case .container, .column, .stack:
             let direction = node.props["direction"]?.stringValue
             return direction != "row" && node.children.contains { takesPlace($0) }
         default: return false

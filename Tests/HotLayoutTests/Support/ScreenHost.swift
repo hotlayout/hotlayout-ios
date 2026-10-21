@@ -8,7 +8,7 @@ import XCTest
 @MainActor
 extension XCTestCase {
     func screenDocument(_ screens: [(String, [JSONValue])], version: String = "9.28.0") throws -> HotlayoutDocument {
-        try loadDocument([
+        try HotlayoutDocument.load([
             "schemaVersion": .string(version), "documentId": "d", "name": "n", "initialScreenId": .string(screens[0].0),
             "screens": .array(
                 screens.map { id, children in
