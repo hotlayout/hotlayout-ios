@@ -17,13 +17,7 @@ enum RecordGroups {
     /// type and equal, without conversion (`1` and `"1"` are two groups). An object or a list
     /// is a group of its own.
     static func isSame(_ left: JSONValue?, _ right: JSONValue?) -> Bool {
-        func missing(_ value: JSONValue?) -> Bool {
-            switch value {
-            case nil, .null?: return true
-            case .string(let text)?: return text.isEmpty
-            default: return false
-            }
-        }
+        func missing(_ value: JSONValue?) -> Bool { ContractShapes.isAbsent(value) }
         if missing(left) || missing(right) { return missing(left) && missing(right) }
         switch (left!, right!) {
         case (.string(let a), .string(let b)): return a == b

@@ -35,25 +35,25 @@ enum IconSet {
     private static let lock = NSLock()
     private static var parsed: [String: [IconElement]] = [:]
 
+    /// The shipped file, parsed once.
+    private static let shipped: JSONValue? = {
+        guard let url = Bundle.module.url(forResource: "icons", withExtension: "json"),
+            let data = try? Data(contentsOf: url)
+        else { return nil }
+        return try? JSONValue.parse(data)
+    }()
+
     /// The raw bodies by name, loaded once.
     static let bodies: [String: String] = {
-        guard let url = Bundle.module.url(forResource: "icons", withExtension: "json"),
-            let data = try? Data(contentsOf: url), let json = try? JSONValue.parse(data)
-        else { return [:] }
         var result: [String: String] = [:]
-        for (name, body) in json["icons"]?.objectValue ?? JSONObject() {
+        for (name, body) in shipped?["icons"]?.objectValue ?? JSONObject() {
             if let body = body.stringValue { result[name] = body }
         }
         return result
     }()
 
     /// The version of the shipped set (`iconSetVersion`).
-    static let shippedVersion: String? = {
-        guard let url = Bundle.module.url(forResource: "icons", withExtension: "json"),
-            let data = try? Data(contentsOf: url), let json = try? JSONValue.parse(data)
-        else { return nil }
-        return json["iconSetVersion"]?.stringValue
-    }()
+    static let shippedVersion: String? = shipped?["iconSetVersion"]?.stringValue
 
     static var names: [String] { bodies.keys.sorted() }
 

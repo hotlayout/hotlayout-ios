@@ -37,18 +37,18 @@ struct NodeMotion: Equatable {
     /// does not know, a missing field, a number out of bounds or an extra field means NO motion.
     static func read(_ value: JSONValue?) -> NodeMotion? {
         guard let object = value?.objectValue,
-            let duration = whole(object["duration"]), durationRange.contains(duration)
+            let duration = ContractShapes.wholeNumber(object["duration"], below: 1e9), durationRange.contains(duration)
         else { return nil }
         var delay = 0
         if object["delay"] != nil {
-            guard let read = whole(object["delay"]), delayRange.contains(read) else { return nil }
+            guard let read = ContractShapes.wholeNumber(object["delay"], below: 1e9), delayRange.contains(read) else { return nil }
             delay = read
         }
         func only(_ own: Set<String>) -> Bool { object.keys.allSatisfy { $0 == "kind" || $0 == "duration" || $0 == "delay" || own.contains($0) } }
         switch object["kind"]?.stringValue {
         case "float":
             guard only(["axis", "amplitude"]), let axis = object["axis"]?.stringValue.flatMap(Axis.init(rawValue:)),
-                let amplitude = whole(object["amplitude"]), amplitudeRange.contains(amplitude)
+                let amplitude = ContractShapes.wholeNumber(object["amplitude"], below: 1e9), amplitudeRange.contains(amplitude)
             else { return nil }
             return NodeMotion(kind: .float(axis: axis, amplitude: amplitude), duration: duration, delay: delay)
         case "pulse":
@@ -67,11 +67,6 @@ struct NodeMotion: Equatable {
     private static func finite(_ value: JSONValue?) -> Double? {
         guard let number = value?.numberValue, number.isFinite else { return nil }
         return number
-    }
-
-    private static func whole(_ value: JSONValue?) -> Int? {
-        guard let number = finite(value), number == number.rounded(.towardZero), abs(number) < 1e9 else { return nil }
-        return Int(number)
     }
 
     /// Where the node is painted `elapsedMs` after it appeared: `theta = 2π·((t − delay) mod

@@ -21,7 +21,7 @@ enum SpacingReference: Equatable {
     init?(_ value: JSONValue?) {
         switch value {
         case .string(let name)?:
-            guard Self.isTokenName(name) else { return nil }
+            guard ContractShapes.isTokenName(name) else { return nil }
             self = .token(name)
         case .number(let number)?:
             guard number.isFinite, number == number.rounded(), number >= 0, number <= Double(Self.maxPixels) else { return nil }
@@ -29,13 +29,6 @@ enum SpacingReference: Equatable {
         default:
             return nil
         }
-    }
-
-    /// `^[a-z][a-zA-Z0-9]{0,39}$`
-    static func isTokenName(_ name: String) -> Bool {
-        let scalars = Array(name.unicodeScalars)
-        guard let first = scalars.first, scalars.count <= 40, first.value >= 97, first.value <= 122 else { return false }
-        return scalars.allSatisfy { ($0.value >= 97 && $0.value <= 122) || ($0.value >= 65 && $0.value <= 90) || ($0.value >= 48 && $0.value <= 57) }
     }
 
     var json: JSONValue {

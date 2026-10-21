@@ -39,7 +39,7 @@ enum ListTileRules {
         else { return nil }
         var radius = tileDefaultRadius
         if let value = tile["radius"] {
-            if let token = value.stringValue, PartStyleRules.isTokenName(token) { radius = value }
+            if let token = value.stringValue, ContractShapes.isTokenName(token) { radius = value }
             if let number = value.numberValue, number == number.rounded(), (0...256).contains(number) { radius = value }
         }
         var size = tileSize
@@ -168,13 +168,6 @@ enum PartStyleRules {
         var typography: JSONValue?
     }
 
-    /// A token name: a lower-case letter and up to 39 letters and digits.
-    static func isTokenName(_ text: String) -> Bool {
-        let scalars = Array(text.unicodeScalars)
-        guard (1...40).contains(scalars.count), let first = scalars.first, first.value >= 97, first.value <= 122 else { return false }
-        return scalars.allSatisfy { ($0.value >= 48 && $0.value <= 57) || ($0.value >= 65 && $0.value <= 90) || ($0.value >= 97 && $0.value <= 122) }
-    }
-
     static func isColorRef(_ value: JSONValue) -> Bool {
         readColor(value) != nil
     }
@@ -183,11 +176,11 @@ enum PartStyleRules {
     static func readColor(_ value: JSONValue?) -> JSONValue? {
         switch value {
         case .string(let token)?:
-            return isTokenName(token) ? value : nil
+            return ContractShapes.isTokenName(token) ? value : nil
         case .object(let object)?:
             let opacityOK = object["opacity"].map { $0.numberValue.map { (0...1).contains($0) } ?? false } ?? true
             if let token = object["token"]?.stringValue {
-                return Set(object.keys) == ["token", "opacity"] && isTokenName(token) && opacityOK ? value : nil
+                return Set(object.keys) == ["token", "opacity"] && ContractShapes.isTokenName(token) && opacityOK ? value : nil
             }
             if let hex = object["value"]?.stringValue {
                 return Set(object.keys).isSubset(of: ["value", "opacity"]) && RGBA(hex: hex) != nil && opacityOK ? value : nil
@@ -200,8 +193,8 @@ enum PartStyleRules {
 
     static func readTypography(_ value: JSONValue?) -> JSONValue? {
         switch value {
-        case .string(let token)?: return isTokenName(token) ? value : nil
-        case .object(let object)?: return object["token"]?.stringValue.map(isTokenName) == true ? value : nil
+        case .string(let token)?: return ContractShapes.isTokenName(token) ? value : nil
+        case .object(let object)?: return object["token"]?.stringValue.map(ContractShapes.isTokenName) == true ? value : nil
         default: return nil
         }
     }

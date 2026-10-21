@@ -110,16 +110,11 @@ struct TextSpanRun: Equatable {
 }
 
 enum TextSpans {
-    private static let tokenName = try! NSRegularExpression(pattern: "^[a-z][a-zA-Z0-9]{0,39}$")
     private static let placeName = try! NSRegularExpression(pattern: "^\(BindableText.namePattern)$")
     private static let hexColor = try! NSRegularExpression(pattern: "^#[0-9a-fA-F]{6}$")
 
-    private static func matches(_ expression: NSRegularExpression, _ text: String) -> Bool {
-        expression.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil
-    }
-
     private static func isTokenName(_ value: JSONValue?) -> Bool {
-        value?.stringValue.map { matches(tokenName, $0) } ?? false
+        value?.stringValue.map(ContractShapes.isTokenName) ?? false
     }
 
     /// A readable colour reference by SHAPE (whether the theme has the token is another question).
@@ -385,7 +380,7 @@ enum TextGradientRules {
     /// effective style (the field is not inherited). The reference is still to be resolved by the
     /// theme: an unknown token or stops out of order give the colour.
     static func reference(type: String, style: JSONObject) -> JSONValue? {
-        guard type == "Text", let value = style["textGradient"], !value.isNull else { return nil }
+        guard WidgetType(type) == .text, let value = style["textGradient"], !value.isNull else { return nil }
         return value
     }
 

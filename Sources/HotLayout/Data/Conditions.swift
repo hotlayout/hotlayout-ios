@@ -35,13 +35,7 @@ enum Conditions {
     }
 
     /// An operand from another path that is absent, `null` or the empty string.
-    static func isOperandMissing(_ value: JSONValue?) -> Bool {
-        switch value {
-        case nil, .null?: return true
-        case .string(let text)?: return text.isEmpty
-        default: return false
-        }
-    }
+    static func isOperandMissing(_ value: JSONValue?) -> Bool { ContractShapes.isAbsent(value) }
 
     /// The filter of a list: a record passes when the operand from another path is missing
     /// (`listFilter.valuePath.operandMissing.inWhere`), otherwise by the condition.

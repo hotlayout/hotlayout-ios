@@ -91,15 +91,6 @@ enum LocaleTags {
     }
 }
 
-/// Whether an anchored expression matches the WHOLE string. ICU's `$` also matches before a
-/// final line feed, JavaScript's does not; the contract's expressions are JavaScript's, so the
-/// match must cover every character.
-func matches(_ expression: NSRegularExpression, _ text: String) -> Bool {
-    let whole = NSRange(text.startIndex..., in: text)
-    guard let match = expression.firstMatch(in: text, range: whole) else { return false }
-    return match.range == whole
-}
-
 extension LocaleResolution {
     /// Which language a document is shown in when the host asks for `requested`.
     ///
