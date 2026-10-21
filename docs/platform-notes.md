@@ -50,8 +50,9 @@ row is checked only for non-empty text.
 - **Glass** (`style.backdropBlur`) blurs what lies under the box with the system blur view, clipped
   by the radius of the node, with the node's background over it. UIKit gives the strength of that
   blur only as a fraction of its effect, so the radius is mapped onto the opacity of the blur view
-  (the whole effect at 20 points) and carries the system's light tint: the area and the order are
-  the contract's, the exact Gaussian sigma is not. On macOS a material stands in.
+  (the whole effect at 20 points). The material's luminance curve, saturation boost and tint layer
+  are taken off, so the colour under the node's own background is the blurred picture, not a greyer
+  one: the area, the order and the colour are the contract's, the exact Gaussian sigma is not. On macOS a material stands in.
 - **Blur under a modal layer**: the blurs of several layers are applied to each picture below once,
   not to the composite.
 

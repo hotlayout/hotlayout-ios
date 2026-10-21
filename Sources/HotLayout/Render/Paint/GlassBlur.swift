@@ -19,6 +19,16 @@ private final class GlassEffectView: UIVisualEffectView {
         overrideUserInterfaceStyle = dark ? .dark : .light
         effect = UIBlurEffect(style: .systemUltraThinMaterial)
         alpha = GlassBlur.strength(forRadius: radius)
+        setNeedsLayout()
+    }
+
+    /// The system material is a blur plus a tint (a luminance curve, a saturation boost and, over
+    /// them, a coloured layer): it lightens and greys whatever lies under it. The contract's glass is
+    /// the blur alone, with the colour of the node's own background over it, so everything but the
+    /// Gaussian filter is taken off the backdrop and the tint layers are hidden.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        GlassBlur.stripTint(of: self)
     }
 }
 
@@ -57,6 +67,22 @@ extension EnvironmentValues {
 }
 
 enum GlassBlur {
+    #if canImport(UIKit)
+    /// Leaves only the blur of a system effect view. The filters are matched by name; a system
+    /// that names them otherwise keeps its material as it is.
+    static func stripTint(of view: UIVisualEffectView) {
+        for (index, sub) in view.subviews.enumerated() {
+            guard let filters = sub.layer.filters, !filters.isEmpty else {
+                // A layer over the backdrop is the tint of the material.
+                if index > 0 { sub.isHidden = true }
+                continue
+            }
+            let blur = filters.filter { ((($0 as AnyObject).value(forKey: "name")) as? String) == "gaussianBlur" }
+            if !blur.isEmpty, blur.count < filters.count { sub.layer.filters = blur }
+        }
+    }
+    #endif
+
     /// The share of the system blur that stands for a radius: the whole effect at 20 points.
     static func strength(forRadius radius: Int) -> CGFloat {
         CGFloat(min(1, Double(max(1, radius)) / 20))

@@ -126,10 +126,14 @@ struct NodeBoxModifier: ViewModifier {
                     clampsToParent: placement.clampsWidth)
             )
             .frame(minHeight: look.minHeight.map { CGFloat($0) }, maxHeight: look.maxHeight.map { CGFloat($0) }, alignment: placement.contentAlignment)
+        let clipsContent = !look.surfaceDrawnByWidget && (rounded || look.width != nil || look.height != nil)
         return
             inner
+            // The content is clipped by the inner edge of the border (the padding box, as in CSS): the
+            // background shows in the corner between the two radii.
+            .clipped(to: InsetCorners(base: shape, amount: border), when: clipsContent && border > 0 && rounded)
             .background(BackgroundView(background: look.background, shadow: look.shadow, shape: shape, context: context))
-            .clipped(to: shape, when: !look.surfaceDrawnByWidget && (rounded || look.width != nil || look.height != nil))
+            .clipped(to: shape, when: clipsContent)
             .overlay {
                 if let color = look.borderColor, border > 0 {
                     if look.borderDashed {
@@ -250,7 +254,7 @@ struct GradientFill: View {
 
 extension View {
     @ViewBuilder
-    func clipped(to shape: LogicalCornersShape, when condition: Bool) -> some View {
+    func clipped<S: Shape>(to shape: S, when condition: Bool) -> some View {
         if condition { self.clipShape(shape) } else { self }
     }
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Border and rim.** The content of a rounded node is clipped by the inner edge of its border
+  (the outer radius less the border width), so the background shows round the corners as it does
+  along the straight edges, as in the other readers.
+- **Glass.** Only the Gaussian blur of the system effect is kept; its luminance curve, saturation
+  boost and tint layer, which greyed the colour of the node's background, are removed.
+
 ## 0.2.0
 
 Reads document contract **9.28.0** (theme 4.0.1, icon set 1.0.0). The contract added no field; it
