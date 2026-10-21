@@ -119,10 +119,9 @@ final class ScreenTopWiringTests: XCTestCase {
     /// The middle of a window drawn by `ModalStack` in a host that leaves these insets.
     private func windowCentre(top: Double, bottom: Double) throws -> Double {
         let stack = ModalStack(
-            page: AnyView(Color.clear),
-            layers: [ModalStack.Layer(
-                id: 1, content: AnyView(Color.green.frame(height: 200)), shape: .window, placement: "center", blur: nil, dismissible: true)],
-            margin: 24, insets: ScreenInsets(top: top, bottom: bottom), dismiss: { _ in })
+            layers: [ModalStackLayer(id: 1, shape: .window, placement: "center", blur: nil, dismissible: true)],
+            margin: 24, insets: ScreenInsets(top: top, bottom: bottom), dismiss: { _ in },
+            page: { Color.clear }, layer: { _ in Color.green.frame(height: 200) })
         let controller = UIHostingController(rootView: stack)
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
         window.rootViewController = controller
@@ -144,6 +143,39 @@ final class ScreenTopWiringTests: XCTestCase {
         let whole = try windowCentre(top: 0, bottom: 0)
         XCTAssertEqual(try windowCentre(top: Self.inset, bottom: 34) - whole, 12.5, accuracy: 1)
         XCTAssertEqual(try windowCentre(top: 20, bottom: 16) - whole, 2, accuracy: 1, "320 × 568 row: 286 against 284")
+    }
+
+    /// The body of a sheet tells the layer how far it is scrolled while the user scrolls, so that a drag down scrolls
+    /// the body back first and moves the sheet only once the body is at its top (`x-sheetDismiss.contentScrolled`;
+    /// the drag reads the layer's `modalScrollSink`).
+    func testSheetDragKnowsHowFarItsBodyIsScrolled() throws {
+        let doc = try HotlayoutDocument.load([
+            "schemaVersion": "9.28.0", "documentId": "d", "name": "n", "initialScreenId": "a",
+            "screens": [
+                ["screenId": "a", "name": "A", "root": ["id": "ra", "type": "Screen", "props": [:], "children": []]],
+                ["screenId": "m", "name": "M", "presentation": "modal", "root": [
+                    "id": "rm", "type": "Screen", "props": ["gap": "none"], "children": [block("tall", height: 3000)]]],
+            ],
+        ])
+        let root = try XCTUnwrap(doc.screen("m")).root
+        let sink = ModalScrollSink()
+        let sheet = ScreenRootView(root: root, context: Harness.context(rightToLeft: false), shrinks: true)
+            .environment(\.modalScrollSink, sink)
+            .frame(width: 393, height: 600)
+        let window = try XCTUnwrap(showScreen(sheet, wait: 0.6) as? UIWindow)
+        let body = try XCTUnwrap(scrollViews(window).max { $0.bounds.height < $1.bounds.height }, "the body scrolls")
+        func dragMovesTheSheet() -> Bool {
+            ModalRules.dragStarts(sheet: true, dismissible: true, scrolled: sink.scrolled, dy: 40, dx: 0, onHandle: false)
+        }
+        XCTAssertTrue(dragMovesTheSheet(), "a body at its top lets the sheet move")
+        body.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
+        runLoop(0.3)
+        XCTAssertEqual(sink.scrolled, 300, accuracy: 1, "the layer knows the offset of the scrolled body")
+        XCTAssertFalse(dragMovesTheSheet(), "scrolled: a drag down scrolls the body")
+        body.setContentOffset(.zero, animated: false)
+        runLoop(0.3)
+        XCTAssertEqual(sink.scrolled, 0, accuracy: 1)
+        XCTAssertTrue(dragMovesTheSheet(), "at the top: the drag moves the sheet")
     }
 }
 #endif

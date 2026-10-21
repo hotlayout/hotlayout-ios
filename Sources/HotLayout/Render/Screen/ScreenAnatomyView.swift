@@ -45,6 +45,8 @@ struct ScreenRootView: View {
     @State private var floatTail = 0.0
     @State private var keyboard = 0.0
     @State private var memory = ScrollMemory()
+    /// The modal layer around the screen, if any: its sheet drag asks how far the body is scrolled.
+    @Environment(\.modalScrollSink) private var modalScrollSink
 
     private static let scrollSpace = "hotlayout-screen-body"
 
@@ -174,23 +176,23 @@ struct ScreenRootView: View {
                 .padding(EdgeInsets(top: 0, leading: CGFloat(look.padding.start), bottom: 0, trailing: CGFloat(look.padding.end)))
                 Color.clear.frame(height: CGFloat(plan.tail + (plan.floats ? floatTail : 0)))
             }
-            .reportsModalBodyScroll()
             .background(
                 GeometryReader { proxy in
                     Color.clear.preference(key: ScrollTopKey.self, value: -Double(proxy.frame(in: .named(Self.scrollSpace)).minY))
                 })
-            .reportsScrollTop { top in
-                memory.top = top
-                refreshScrolled(plan)
-            }
+            .reportsScrollTop { bodyScrolled(to: $0, plan) }
         }
         .coordinateSpace(name: Self.scrollSpace)
-        .modalBodyScrollSpace()
         .scrollDismissesKeyboard(.interactively)
-        .onPreferenceChange(ScrollTopKey.self) { top in
-            memory.top = top
-            refreshScrolled(plan)
-        }
+        .onPreferenceChange(ScrollTopKey.self) { bodyScrolled(to: $0, plan) }
+    }
+
+    /// The body is scrolled `top` points from its top: the app bar may take its scrolled look, and
+    /// the sheet around the screen learns whether a drag moves it or the body.
+    private func bodyScrolled(to top: Double, _ plan: Plan) {
+        memory.top = top
+        modalScrollSink?.scrolled = max(0, top)
+        refreshScrolled(plan)
     }
 
     @ViewBuilder

@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// How far the body of the layer is scrolled from its top. The scroll view of the screen reports
-/// it (`modalBodyScroll`), the drag of a sheet asks (a drag moves the sheet only at the top).
+/// How far the body of the layer is scrolled from its top. The scroll view of the screen body
+/// reports it as the user scrolls (`reportsScrollTop`); the drag of a sheet asks (a drag moves
+/// the sheet only at the top, `x-sheetDismiss.contentScrolled`).
 final class ModalScrollSink {
     var scrolled: Double = 0
 }
@@ -14,39 +15,6 @@ extension EnvironmentValues {
     var modalScrollSink: ModalScrollSink? {
         get { self[ModalScrollSinkKey.self] }
         set { self[ModalScrollSinkKey.self] = newValue }
-    }
-}
-
-private struct BodyScrollKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
-private let bodySpaceName = "hotlayout-modal-body"
-
-extension View {
-    /// On the scroll view of a screen body: gives the content a coordinate space to be measured in.
-    func modalBodyScrollSpace() -> some View { coordinateSpace(name: bodySpaceName) }
-
-    /// On the content of a scroll view: reports how far it is scrolled to the layer around it.
-    func reportsModalBodyScroll() -> some View { modifier(ReportsBodyScroll()) }
-}
-
-private struct ReportsBodyScroll: ViewModifier {
-    @Environment(\.modalScrollSink) private var sink
-
-    func body(content: Content) -> some View {
-        if let sink {
-            content
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear.preference(key: BodyScrollKey.self, value: proxy.frame(in: .named(bodySpaceName)).minY)
-                    }
-                )
-                .onPreferenceChange(BodyScrollKey.self) { sink.scrolled = max(0, Double(-$0)) }
-        } else {
-            content
-        }
     }
 }
 
