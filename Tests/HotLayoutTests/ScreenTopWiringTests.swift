@@ -97,5 +97,53 @@ final class ScreenTopWiringTests: XCTestCase {
         let scrolled = try shoot(doc, scrollBy: 400)
         XCTAssertTrue(scrolled.isColor(300, 80, Self.white), "scrolled: its own background")
     }
+
+    /// A round picture with a border (`style.border` on an `Image`): the ring is drawn round the picture.
+    func testBorderOfARoundImageIsDrawn() throws {
+        let avatar: JSONValue = [
+            "id": "avatar", "type": "Image", "props": ["source": ["kind": "asset", "asset": "placeholder"], "aspectRatio": "1:1", "fit": "cover"],
+            "style": ["width": 100, "height": 100, "radius": "pill", "border": ["width": 4, "color": ["value": "#00ff00"]]],
+        ]
+        let doc = try loadDocument([
+            "schemaVersion": "9.28.0", "documentId": "d", "name": "n", "initialScreenId": "a",
+            "screens": [["screenId": "a", "name": "A", "root": [
+                "id": "r", "type": "Screen", "props": ["gap": "none"],
+                "style": ["background": fill(Self.magenta), "padding": ["top": "none", "bottom": "none", "start": "none", "end": "none"]],
+                "children": [avatar]]]],
+        ])
+        let pixels = try shoot(doc, scrollBy: nil)
+        let ring = (0..<pixels.height).contains { y in (0..<150).contains { x in pixels.isColor(x, y, Self.green) } }
+        XCTAssertTrue(ring, "the green ring of the border is on the screen")
+    }
+
+    /// The middle of a window drawn by `ModalStack` in a host that leaves these insets.
+    private func windowCentre(top: Double, bottom: Double) throws -> Double {
+        let stack = ModalStack(
+            page: AnyView(Color.clear),
+            layers: [ModalStack.Layer(
+                id: 1, content: AnyView(Color.green.frame(height: 200)), shape: .window, placement: "center", blur: nil, dismissible: true)],
+            margin: 24, insets: ScreenInsets(top: top, bottom: bottom), dismiss: { _ in })
+        let controller = UIHostingController(rootView: stack)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        runLoop(0.8)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { window.layer.render(in: $0.cgContext) }
+        let pixels = Pixels(try XCTUnwrap(image.cgImage))
+        // The scrim is black over a clear page; the window is the green block.
+        let rows = (0..<pixels.height).filter { (pixels.rgb(196, $0)?.g ?? 0) > 150 }
+        return Double(try XCTUnwrap(rows.first) + (try XCTUnwrap(rows.last)) + 1) / 2
+    }
+
+    /// A window (`modalPlacement: center`) stands in the middle of the area between the inset and the home indicator
+    /// (`x-style.layout.safeTop.modal.window`; `modalAreaCases`: 59 above and 34 below on 852 gives 438.5, which is
+    /// 12.5 below the middle of the whole screen).
+    func testCenteredWindowStandsInTheAreaBelowTheInset() throws {
+        let whole = try windowCentre(top: 0, bottom: 0)
+        XCTAssertEqual(try windowCentre(top: Self.inset, bottom: 34) - whole, 12.5, accuracy: 1)
+        XCTAssertEqual(try windowCentre(top: 20, bottom: 16) - whole, 2, accuracy: 1, "320 × 568 row: 286 against 284")
+    }
 }
 #endif
