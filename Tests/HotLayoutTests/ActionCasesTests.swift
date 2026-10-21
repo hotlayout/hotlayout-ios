@@ -91,8 +91,8 @@ final class ActionCasesTests: XCTestCase {
             ("depth", .number(Double(event.depth))),
             ("record", event.record.map(Self.recordJSON) ?? .null),
         ])
-        if let placement = event.modalPlacement { object["modalPlacement"] = .string(placement) }
-        if let icons = event.statusBarIcons { object["statusBarIcons"] = .string(icons) }
+        if let placement = event.placement?.rawValue { object["modalPlacement"] = .string(placement) }
+        if let icons = event.statusBar?.rawValue { object["statusBarIcons"] = .string(icons) }
         return .object(object)
     }
 

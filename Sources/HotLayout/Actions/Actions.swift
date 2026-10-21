@@ -19,7 +19,9 @@ public enum StandardAction: Equatable, Sendable {
 
 /// A parameter of a standard action that did not pass its form, and why.
 public struct InvalidActionParam: Equatable, Sendable {
+    /// The name of the parameter.
     public let param: String
+    /// What is wrong with its value.
     public let problem: ActionParamProblem
 
     public init(param: String, problem: ActionParamProblem) {
@@ -34,10 +36,13 @@ public struct InvalidActionParam: Equatable, Sendable {
 /// an address is checked by its form and handed over as `standard` or `invalid`, never both.
 /// `track` is not part of it: the analytics event goes separately, before the action.
 public struct HotlayoutAction: Equatable, Sendable {
+    /// The `type` of the action as the document names it.
     public let type: String
     /// Parameters after `paramBindings` were applied; `nil` when there are none.
     public let params: [String: String]?
+    /// The checked form of a standard action; `nil` for any other action.
     public let standard: StandardAction?
+    /// The parameter of a standard action that failed its form; `nil` when the action is usable.
     public let invalid: InvalidActionParam?
 
     public init(type: String, params: [String: String]? = nil, standard: StandardAction? = nil, invalid: InvalidActionParam? = nil) {
@@ -56,7 +61,9 @@ public enum HapticFeedback: String, CaseIterable, Equatable, Sendable {
 
 /// The analytics event of a press (`track`), sent once per press, before the action.
 public struct TrackEvent: Equatable, Sendable {
+    /// The name of the event.
     public let event: String
+    /// The parameters of the event; `nil` when there are none.
     public let params: [String: String]?
 }
 

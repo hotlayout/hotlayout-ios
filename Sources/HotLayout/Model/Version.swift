@@ -59,6 +59,7 @@ public enum VersionVerdict: Equatable, Sendable {
     case newerMinor(documentVersion: String)
     case incompatible(reason: String, relation: IncompatibleRelation)
 
+    /// Whether the reader reads the document.
     public var isReadable: Bool {
         if case .incompatible = self { return false }
         return true

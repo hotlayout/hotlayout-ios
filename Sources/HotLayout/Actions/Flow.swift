@@ -7,25 +7,54 @@ public enum ScreenShownCause: String, Equatable, Sendable {
 
 /// The screen-shown event: once per change of the top of the stack.
 public struct ScreenShownEvent: Equatable, Sendable {
+    /// The `documentId` of the document the screen belongs to.
     public let documentId: String
+    /// The screen that is now on top.
     public let screenId: String
     /// The named entry point the flow started from; `nil` when none was named or it is unknown.
     public let entry: String?
+    /// Whether the screen is a page or a modal layer.
     public let presentation: ScreenPresentation
+    /// Why the screen was shown.
     public let cause: ScreenShownCause
+    /// The number of screens on the stack, this one included.
     public let depth: Int
     /// The record the screen was opened with.
     public let record: DataScope?
+    /// Where the modal screen lies; `nil` unless the screen is modal and names it.
+    public let placement: ModalPlacement?
+    /// The request of the shown screen about the icons of the status bar, only when the screen
+    /// names one. The host does what it likes with it.
+    public let statusBar: StatusBarIcons?
+
     /// `bottom` / `center`, only for a modal screen that names it.
-    public let modalPlacement: String?
-    /// The request of the shown screen about the icons of the status bar (`light` / `dark`), only
-    /// when the screen names one. The host does what it likes with it.
-    public let statusBarIcons: String?
+    @available(*, deprecated, message: "Use `placement`.")
+    public var modalPlacement: String? { placement?.rawValue }
+
+    /// `light` / `dark`, only when the screen names one.
+    @available(*, deprecated, message: "Use `statusBar`.")
+    public var statusBarIcons: String? { statusBar?.rawValue }
+
+    init(
+        documentId: String, screenId: String, entry: String?, presentation: ScreenPresentation, cause: ScreenShownCause, depth: Int,
+        record: DataScope?, modalPlacement: String?, statusBarIcons: String?
+    ) {
+        self.documentId = documentId
+        self.screenId = screenId
+        self.entry = entry
+        self.presentation = presentation
+        self.cause = cause
+        self.depth = depth
+        self.record = record
+        self.placement = modalPlacement.flatMap(ModalPlacement.init(rawValue:))
+        self.statusBar = statusBarIcons.flatMap(StatusBarIcons.init(rawValue:))
+    }
 }
 
 /// A screen change the reader is about to make by itself, asked of the host first
 /// (`HotlayoutScreen.onNavigate`).
 public struct NavigationEvent: Equatable, Sendable {
+    /// What kind of change of screen is asked for.
     public enum Kind: String, Equatable, Sendable {
         /// `navigate` to a screen of the document: a screen is put on the stack.
         case push
@@ -35,6 +64,7 @@ public struct NavigationEvent: Equatable, Sendable {
         case `switch`
     }
 
+    /// The kind of change.
     public let kind: Kind
     /// The screen on top of the stack now.
     public let from: String
@@ -42,6 +72,7 @@ public struct NavigationEvent: Equatable, Sendable {
     public let to: String
     /// The action that asks for the change, as `onAction` would receive it.
     public let action: HotlayoutAction
+    /// The node that was pressed, and the record it reads.
     public let source: ActionSource
 }
 
@@ -263,6 +294,8 @@ struct Flow: Equatable, Sendable {
             outcome.hostRecord = record
         }
 
+        guard let current = stack.last?.screenId else { return outcome }
+
         switch ActionType(type) {
         case ActionType.none?:
             return outcome
@@ -271,7 +304,7 @@ struct Flow: Equatable, Sendable {
                 toHost()
                 return outcome
             }
-            guard allowNavigation(.push, stack.last!.screenId, target, handed) else { return outcome }
+            guard allowNavigation(.push, current, target, handed) else { return outcome }
             let carried = RecordScope.carriesRecord(
                 insideListItem: !instances.isEmpty, presentation: screen.presentation, carryRecord: action["carryRecord"]?.boolValue == true)
             stack.append(FlowFrame(screenId: target, chain: carried ? chain : []))
@@ -281,7 +314,7 @@ struct Flow: Equatable, Sendable {
                 toHost()
                 return outcome
             }
-            guard allowNavigation(.back, stack.last!.screenId, stack[stack.count - 2].screenId, handed) else { return outcome }
+            guard allowNavigation(.back, current, stack[stack.count - 2].screenId, handed) else { return outcome }
             stack.removeLast()
             outcome.shown = shownEvent(cause: .back)
         case .navigateSection:
@@ -291,7 +324,7 @@ struct Flow: Equatable, Sendable {
             }
             // The same single screen: nothing changes and nothing is shown.
             guard let next = NavBarRules.sectionStack(stack.map(\.screenId), target: target) else { return outcome }
-            guard allowNavigation(.switch, stack.last!.screenId, target, handed) else { return outcome }
+            guard allowNavigation(.switch, current, target, handed) else { return outcome }
             stack = next.map { FlowFrame(screenId: $0) }
             outcome.shown = shownEvent(cause: .switch)
         default:

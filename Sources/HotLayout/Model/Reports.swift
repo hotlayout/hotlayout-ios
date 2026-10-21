@@ -6,6 +6,7 @@ import Foundation
 /// (the rest of the screen is drawn) and goes into a report, so that the host can log it.
 /// Nothing in a report is shown to the end user.
 public struct HotlayoutReport: Equatable, Hashable, Sendable, CustomStringConvertible {
+    /// What the reader did with the piece.
     public enum Kind: String, Equatable, Hashable, Sendable {
         /// A piece of the wrong shape was ignored (`ignored-input`).
         case ignoredInput = "ignored-input"
@@ -15,9 +16,11 @@ public struct HotlayoutReport: Equatable, Hashable, Sendable, CustomStringConver
         case unknownToken = "unknown-token"
     }
 
+    /// What the reader did with the piece.
     public let kind: Kind
     /// Where in the document: `screen “home”: node “hero”: props.content`.
     public let location: String
+    /// Why, in a sentence for the developer.
     public let reason: String
 
     init(kind: Kind, location: String, reason: String) {
@@ -26,6 +29,7 @@ public struct HotlayoutReport: Equatable, Hashable, Sendable, CustomStringConver
         self.reason = reason
     }
 
+    /// `[kind] location: reason`.
     public var description: String { "[\(kind.rawValue)] \(location): \(reason)" }
 }
 
