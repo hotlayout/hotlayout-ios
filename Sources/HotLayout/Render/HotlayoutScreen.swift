@@ -284,11 +284,11 @@ public struct HotlayoutScreen: View {
             sink: sink,
             images: images,
             pressHandler: { action, node, instances in perform(action, node: node, instances: instances) },
+            backLabel: labels.back,
             write: { path, value in write(path, value) },
             carousels: carousels,
             frameIndex: index
         )
-        context.backLabel = labels.back
         context.widthClass = widthClass
         // One plan per screen, made before anything is drawn: a list cannot know what the lists before it drew.
         let budget = ListBudget.plan(root: root, scope: scope)
