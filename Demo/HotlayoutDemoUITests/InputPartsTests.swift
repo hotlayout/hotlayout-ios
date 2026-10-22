@@ -48,6 +48,17 @@ final class InputPartsTests: XCTestCase {
         XCTAssertGreaterThan(first, 20, "the counter is drawn before anything is typed")
         phone.tap()
         phone.typeText("0501234567")
+        // The numeric pad has no return key and covers the lower part of the screen, the counter
+        // included (on every iOS version: the screen keeps its size when the keyboard comes). The
+        // ink under the box would then be the keys, not the counter, so the form is scrolled until
+        // the counter stands above the keyboard before it is measured.
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        for _ in 0..<4 where phone.frame.maxY + 40 > keyboard.frame.minY {
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            from.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)))
+        }
+        XCTAssertLessThan(phone.frame.maxY + 28, keyboard.frame.minY, "the counter stands above the keyboard when it is measured")
         let after = app.screenshot()
         attachScreenshot(app, "phone typed")
         XCTAssertGreaterThan(ink(after, region(after)), 20, "the counter is drawn after typing")
