@@ -35,6 +35,9 @@ struct RewardsScreen: View {
                 )
             } else if let failure {
                 Text("This screen is not available: \(failure.description)")
+            } else {
+                // Not an empty `Group`: an empty view on the first frame never runs `.task`.
+                ProgressView()
             }
         }
         .task {

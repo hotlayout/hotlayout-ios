@@ -74,6 +74,9 @@ struct RewardsScreen: View {
                 )
             } else if let failure {
                 Text("This screen is not available: \(failure.description)")
+            } else {
+                // Not an empty `Group`: an empty view on the first frame never runs `.task`.
+                ProgressView()
             }
         }
         .task {
@@ -89,6 +92,12 @@ struct RewardsScreen: View {
     }
 }
 ```
+
+**Device language.** `Locale.current` gives the language of the device only if the app declares
+the languages it is localized for (the app's localizations in the Xcode project, or
+`CFBundleLocalizations` in `Info.plist`). Without that iOS reports English, and a document that has an
+Arabic translation stays English on an Arabic device. Declare the languages of your documents, or
+pass `Locale.preferredLanguages.first` as `locale`.
 
 An `onAction` may be `async`. A button that confirms by a swipe then stays busy until the
 handler returns (with a plain handler: until the screen changes, or eight seconds):
