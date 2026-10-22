@@ -44,13 +44,42 @@ struct DemoRoot: View {
     private var fixtureList: some View {
         NavigationStack {
             List(Fixtures.names, id: \.self) { name in
-                NavigationLink(name) {
-                    FixtureScreen(name: name, screenId: nil, locale: nil)
-                        .navigationTitle(name)
-                        .navigationBarTitleDisplayMode(.inline)
-                }
+                NavigationLink(name) { ListedFixture(name: name) }
             }
             .navigationTitle("HotLayout fixtures")
+        }
+    }
+}
+
+/// A fixture opened from the list. The document draws its own bar, so the demo's navigation bar is
+/// hidden; the arrow of the document, which has nowhere to go back to on its first screen, comes to
+/// the host as `navigate.back`, and the host closes the screen.
+struct ListedFixture: View {
+    let name: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        FixtureScreen(name: name, screenId: nil, locale: nil, onBackAtRoot: { dismiss() })
+            .toolbar(.hidden, for: .navigationBar)
+            .background(SwipeBackRestorer())
+    }
+}
+
+/// Hiding the navigation bar turns off the edge swipe that goes back; this gives it back.
+private struct SwipeBackRestorer: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {}
+
+    final class Controller: UIViewController, UIGestureRecognizerDelegate {
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard let pop = navigationController?.interactivePopGestureRecognizer else { return }
+            pop.delegate = self
+            pop.isEnabled = true
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            (navigationController?.viewControllers.count ?? 0) > 1
         }
     }
 }
@@ -130,6 +159,9 @@ struct FixtureScreen: View {
     let name: String
     let screenId: String?
     let locale: String?
+    /// Called when the document's own «back» has no screen left to return to (`navigate.back` on the
+    /// first screen reaches the host). Nil when the demo runs straight on a fixture.
+    var onBackAtRoot: (() -> Void)?
     @State private var lastAction = ""
     /// `-showActions YES`: what reached the host, counted, as text the UI tests can read.
     @State private var actionLog: [String] = []
@@ -193,6 +225,7 @@ struct FixtureScreen: View {
                 lastAction = action.type
                 let verdict = action.standard != nil ? "standard" : (action.invalid.map { "invalid:\($0.param)" } ?? "other")
                 actionLog.append("\(action.type)|\(verdict)")
+                if action.type == "navigate.back" { onBackAtRoot?() }
             },
             onTrack: { event, _ in actionLog.append("track:\(event.event)") },
             onScreenChange: { event in
