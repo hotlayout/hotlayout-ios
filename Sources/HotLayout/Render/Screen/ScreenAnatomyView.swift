@@ -157,11 +157,19 @@ struct ScreenRootView: View {
     private func scroll(_ plan: Plan, look: BoxLook, inner: RenderContext, minBlock: CGFloat?) -> some View {
         ScrollViewReader { reader in
             scrollView(plan, look: look, inner: inner, minBlock: minBlock)
-                .onChange(of: focusedField) { id in
-                    // The field with the keyboard stays in the body area above it.
-                    guard let id else { return }
-                    withAnimation(.easeOut(duration: 0.2)) { reader.scrollTo(id, anchor: .center) }
-                }
+                .onChange(of: focusedField) { _ in reveal(reader) }
+                // The keyboard arrives after the focus does and shrinks the body area: the field is
+                // brought into the smaller area once the area has its new size.
+                .onChange(of: keyboard) { _ in reveal(reader) }
+        }
+    }
+
+    /// Scrolls the focused field, with the helper or counter under it (they share its id), into the
+    /// body area by the smallest amount; a field that is in view does not move.
+    private func reveal(_ reader: ScrollViewProxy) {
+        guard let id = focusedField else { return }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.2)) { reader.scrollTo(id) }
         }
     }
 

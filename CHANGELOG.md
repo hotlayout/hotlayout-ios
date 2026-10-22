@@ -4,6 +4,10 @@
 
 Drawing:
 
+- **Focused field above the keyboard.** The field with the keyboard, together with the helper or
+  counter under it, is scrolled into the body area once the keyboard has shrunk the area (before,
+  the scroll ran on focus, ahead of the keyboard, and the field could stay under it). A field that
+  is already in view does not move.
 - **Glass over a light picture.** The material of the glass now follows the brightness of what
   lies around it on the screen, not the theme: glass over a light gradient on a dark theme (the
   round buttons and the tile of a reward hero) is light and keeps the colour under it, where the
