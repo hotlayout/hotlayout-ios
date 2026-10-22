@@ -145,7 +145,7 @@ struct NodeBoxModifier: ViewModifier {
             }
             .compositingGroup()
             .shadowLayers(look.shadow, shape: shape)
-            .glass(look.backdropBlur, shape: shape)
+            .glass(look.backdropBlur, shape: shape, cover: GlassBlur.cover(look.background))
             .opacity(look.opacity ?? 1)
             .padding(EdgeInsets(top: look.margin.top, leading: look.margin.start, bottom: look.margin.bottom, trailing: look.margin.end))
     }

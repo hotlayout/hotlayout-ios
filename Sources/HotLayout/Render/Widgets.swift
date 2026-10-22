@@ -214,7 +214,7 @@ struct ButtonWidget: View {
                     }
                 }
                 .shadowLayers(ShadowTint.apply(resolver.shadow(style["shadow"]) ?? [], style: style, resolver: resolver), shape: shape)
-                .glass(ownLook.backdropBlur, shape: shape)
+                .glass(ownLook.backdropBlur, shape: shape, cover: gradient == nil ? background?.alpha ?? 0 : 0)
                 .contentShape(shape)
             }
             .buttonStyle(PressFeedbackStyle(kind: PressFeedbackRules.kind(node)))

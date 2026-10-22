@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Drawing:
+
+- **Glass over a light picture.** The material of the glass now follows the brightness of what
+  lies around it on the screen, not the theme: glass over a light gradient on a dark theme (the
+  round buttons and the tile of a reward hero) is light and keeps the colour under it, where the
+  dark blur turned it a muddy grey. Until the screen has been read the theme decides, as before.
+- **Glass under a nearly opaque background.** The share of the blur spent grows with the opacity
+  of the node's own background colour, which hides the tint of the system blur: a scrolled app bar
+  or a navigation bar with a dense background now blurs what passes under it as fully as the other
+  readers, while a faint glass card keeps its colour.
+
 ## 0.2.1
 
 Drawing:

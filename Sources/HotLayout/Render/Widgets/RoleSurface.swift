@@ -74,7 +74,7 @@ extension View {
                 }
             }
             .shadowLayers(surface.shadow, shape: shape)
-            .glass(surface.backdropBlur, shape: shape)
+            .glass(surface.backdropBlur, shape: shape, cover: surface.gradient == nil ? surface.background?.alpha ?? 0 : 0)
             .contentShape(shape)
     }
 }

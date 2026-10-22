@@ -50,13 +50,17 @@ row is checked only for non-empty text.
 - **Glass** (`style.backdropBlur`) blurs what lies under the box with the system blur view, clipped
   by the radius of the node, with the node's background over it. UIKit gives the strength of that
   blur only as a fraction of its effect, so the radius is mapped onto the opacity of the blur view
-  (the whole effect at 40 points). The system blur also lifts and greys the colour under it, and
-  that cannot be switched off: the reader uses the dark blur on a dark theme (the one that moves
-  the colour least) and the ultra thin material on a light one, and spends only a share of the
-  effect, which weakens the tint with the blur. On the Orbit home screen a Stardust card is within
-  a few colour levels of the other readers, a little greyer; a larger radius is greyer still. The
-  area and the order are the contract's; the exact Gaussian sigma and the exact colour are not.
-  On macOS a material stands in.
+  (the whole effect at 40 points). The system blur also lifts or darkens the colour under it, and
+  that cannot be switched off with public API, so the tint is made to agree with the picture: the
+  reader reads the brightness of a narrow band around the glass from the screen once it is drawn
+  and takes the dark blur over a dark picture and the ultra thin light material over a light one
+  (the theme decides until the screen has been read). Only the share of the effect whose tint the
+  node's own background leaves showing is spent: under a background colour of opacity `c` the
+  effect is `1 / (1 − c)` times the share of the radius, so a bar with a nearly opaque background
+  blurs fully while a faint glass card keeps the colour under it. On the Orbit home screen a
+  Stardust card is within a few colour levels of the other readers, a little greyer; the area and
+  the order are the contract's; the exact Gaussian sigma and the exact colour are not. On macOS a
+  material stands in.
 - **Blur under a modal layer**: the blurs of several layers are applied to each picture below once,
   not to the composite.
 
