@@ -216,6 +216,10 @@ public struct HotlayoutScreen: View {
                 page: {
                     if let pageScreen {
                         screenView(pageScreen, frame: frames[pageIndex], index: pageIndex, place: place, insets: insets, asLayer: false)
+                            // Keyed by the place in the stack and the screen, as in the other readers: the page that
+                            // replaces another is a new view, so it starts at its top instead of inheriting the
+                            // scroll of the screen it replaced (SwiftUI would reuse the same scroll view).
+                            .id("\(pageIndex)/\(pageScreen.screenId)")
                     } else {
                         Color.clear
                     }
