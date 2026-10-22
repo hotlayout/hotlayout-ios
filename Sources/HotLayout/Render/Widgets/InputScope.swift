@@ -47,3 +47,15 @@ struct WriteControlTraits: ViewModifier {
         }
     }
 }
+
+private struct FieldTailKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
+
+extension EnvironmentValues {
+    /// What the body of the screen keeps under its last child: the gap of the screen above a pinned
+    /// block, the bottom padding of the root without one. A focused field is brought into view with
+    /// this much room under it (and under the line below it), not flush with the edge of the area.
+    var fieldTail: CGFloat {
+        get { self[FieldTailKey.self] }
+        set { self[FieldTailKey.self] = newValue }
+    }
+}

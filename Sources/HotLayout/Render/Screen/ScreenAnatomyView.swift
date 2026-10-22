@@ -168,9 +168,14 @@ struct ScreenRootView: View {
     /// body area by the smallest amount; a field that is in view does not move.
     private func reveal(_ reader: ScrollViewProxy) {
         guard let id = focusedField else { return }
-        DispatchQueue.main.async {
+        func scroll() {
+            guard focusedField == id else { return }
             withAnimation(.easeOut(duration: 0.2)) { reader.scrollTo(id) }
         }
+        DispatchQueue.main.async(execute: scroll)
+        // The keyboard and the typing that follows the tap may cut the first scroll short; once they
+        // settle, the same request finds the block in view with its tail and moves nothing.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: scroll)
     }
 
     private func scrollView(_ plan: Plan, look: BoxLook, inner: RenderContext, minBlock: CGFloat?) -> some View {
@@ -181,6 +186,7 @@ struct ScreenRootView: View {
                     children: plan.body, gap: plan.gap, node: root, space: HostSpace(block: nil, minBlock: minBlock, fills: false), context: inner, depth: 0
                 )
                 .contentColumn(plan.contentMax)
+                .environment(\.fieldTail, CGFloat(plan.tail))
                 .padding(EdgeInsets(top: 0, leading: CGFloat(look.padding.start), bottom: 0, trailing: CGFloat(look.padding.end)))
                 Color.clear.frame(height: CGFloat(plan.tail + (plan.floats ? floatTail : 0)))
             }

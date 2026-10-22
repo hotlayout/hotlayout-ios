@@ -5,6 +5,16 @@ import XCTest
 /// the pinned block riding above it; the field is scrolled into that area together with the line
 /// under it; the app bar stands where it stood.
 final class KeyboardFocusTests: XCTestCase {
+    /// `Screen.props.gap` of the survey («lg») and the bottom padding of the parts form («lg») in the built-in theme.
+    private static let surveyGap = 16.0
+    private static let partsBottomPadding = 16.0
+    /// From the bottom of the accessibility frame of the single-line field to the bottom of its counter line.
+    private static let counterLine = 31.7
+    /// The keyboard of iOS 26 is a sheet with rounded corners: its frame starts about this far above the keys.
+    private static let keyboardFrameMargin = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? 16.5 : 0.0
+    /// The accessibility frame of a multi-line field ends this far above the bottom of its box.
+    private static let textViewInset = 13.0
+
     override func setUp() { continueAfterFailure = false }
 
     private func keyboard(_ app: XCUIApplication) -> XCUIElement {
@@ -30,6 +40,10 @@ final class KeyboardFocusTests: XCTestCase {
         attachScreenshot(app, "parts focused")
         // The counter is the line under the box: the box and 28 points under it are above the keys.
         XCTAssertLessThan(phone.frame.maxY + 28, keys.frame.minY, "the field and its counter are above the keyboard")
+        // Without a pinned block the tail is the bottom padding of the root: it stays under the counter
+        // line (the counter is not exposed to accessibility; its line ends `counterLine` below the field).
+        XCTAssertEqual(keys.frame.minY - phone.frame.maxY, Self.partsBottomPadding + Self.counterLine + Self.keyboardFrameMargin, accuracy: 1,
+                       "the bottom padding of the root stays between the counter and the keyboard")
     }
 
     func testPinnedButtonRidesAboveKeyboardAndBarStays() {
@@ -47,6 +61,9 @@ final class KeyboardFocusTests: XCTestCase {
         XCTAssertTrue(next.exists)
         XCTAssertLessThanOrEqual(next.frame.maxY, keys.frame.minY, "the pinned block rides above the keyboard")
         XCTAssertLessThan(note.frame.maxY, next.frame.minY, "the field is in the body area above the pinned block")
+        // The tail of the body stays under the field: the gap of the screen, not flush with the button.
+        // (A tall screen may leave more than the gap: the block was in view with its tail and did not move.)
+        XCTAssertGreaterThanOrEqual(next.frame.minY - note.frame.maxY, Self.surveyGap + Self.textViewInset - 1, "the gap of the screen stays between the field and the pinned block")
         XCTAssertEqual(bar.frame.minY, barTop, accuracy: 1, "the app bar stands")
     }
 

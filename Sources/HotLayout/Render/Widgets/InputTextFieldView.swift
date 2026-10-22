@@ -30,6 +30,7 @@ struct InputTextFieldWidget: View {
     @State private var localFocus: String?
     /// The stand-in field of macOS takes the focus from SwiftUI; the native control of iOS from UIKit.
     @FocusState private var standInFocus: String?
+    @Environment(\.fieldTail) private var tail
 
     var body: some View {
         let look = InputLook(context: context)
@@ -73,7 +74,11 @@ struct InputTextFieldWidget: View {
             wasFocused = now
             apply(now ? .focus : .blur, numeric: numeric, bound: bound, boundText: boundText, path: path, disabled: disabled)
         }
-        .id(node.id)
+        // The id covers the tail under the block, so that scrolling it into view leaves the tail visible;
+        // the opposite padding keeps the layout of the block as it was.
+        .padding(.bottom, tail)
+        .background(Color.clear.id(node.id))
+        .padding(.bottom, -tail)
     }
 
     // MARK: Parts
