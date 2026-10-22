@@ -22,7 +22,7 @@ HotLayout is installed with Swift Package Manager.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/hotlayout/hotlayout-ios", from: "0.2.0"),
+    .package(url: "https://github.com/hotlayout/hotlayout-ios", from: "0.2.1"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -35,7 +35,7 @@ targets: [
 
 1. Choose File > Add Package Dependencies...
 2. Paste `https://github.com/hotlayout/hotlayout-ios` into the search field.
-3. Set the dependency rule to Up to Next Major Version, from `0.2.0`, and choose Add Package.
+3. Set the dependency rule to Up to Next Major Version, from `0.2.1`, and choose Add Package.
 4. Add the `HotLayout` library to your app target, then `import HotLayout`.
 
 ## Use
