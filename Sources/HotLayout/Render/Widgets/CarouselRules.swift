@@ -120,6 +120,23 @@ enum CarouselRules {
         return best
     }
 
+    /// Release speed, in points per second, under which a throw counts as no flick: Flutter's
+    /// scroll tolerance, `1 / (0.050 * pixelRatio)`.
+    static func flickThreshold(scale: Double) -> Double { 1 / (0.05 * max(scale, 1)) }
+
+    /// Where a release ends. A flick (speed above `threshold`) moves to the next stop from the
+    /// current `offset` in the direction of the velocity (`forward` is toward the end), clamped to
+    /// the first and last stop; a slower release goes to the stop nearest to where the throw
+    /// would land (`landing`). Offsets are from the logical start.
+    static func releaseStop(_ stops: [Double], offset: Double, landing: Double, speed: Double, forward: Bool, threshold: Double) -> Int {
+        guard !stops.isEmpty else { return 0 }
+        if speed > threshold {
+            if forward { return stops.firstIndex { $0 > offset + stopMerge } ?? stops.count - 1 }
+            return stops.lastIndex { $0 < offset - stopMerge } ?? 0
+        }
+        return activeStop(stops, offset: landing)
+    }
+
     // MARK: Dots
 
     static func dotsRowWidth(count: Int, dotSize: Double, dotGap: Double) -> Double {

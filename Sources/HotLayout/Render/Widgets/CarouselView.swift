@@ -34,19 +34,34 @@ private struct CardWidthsKey: PreferenceKey {
     }
 }
 
-/// Snaps the end of a scroll to the nearest stop. The stops are offsets from the logical start;
-/// a scroll view in right-to-left text counts its offset from the other edge.
+/// The offset (from the logical start) the scroll is at now; the scroll target behavior has no
+/// way to ask for it.
+private final class CurrentOffset {
+    var value: Double = 0
+}
+
+/// Ends a scroll on a stop: a flick moves one stop on, a slower release goes to the nearest. The
+/// stops are offsets from the logical start; a scroll view in right-to-left text counts its
+/// offset from the other edge.
 @available(iOS 17.0, macOS 14.0, *)
 private struct CarouselSnap: ScrollTargetBehavior {
     var stops: [Double]
     var rightToLeft: Bool
+    var scale: Double
+    var current: CurrentOffset
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
         guard stops.count > 1 else { return }
         let maxScroll = max(0, context.contentSize.width - context.containerSize.width)
         let physical = target.rect.origin.x
         let logical = rightToLeft ? maxScroll - physical : physical
-        let stop = stops[CarouselRules.activeStop(stops, offset: logical)]
+        // The velocity is that of the offset, in points per millisecond: positive moves toward
+        // larger physical offsets; in right-to-left those are earlier stops.
+        let forwardPhysical = context.velocity.dx > 0
+        let index = CarouselRules.releaseStop(
+            stops, offset: current.value, landing: logical, speed: abs(Double(context.velocity.dx)) * 1000,
+            forward: rightToLeft ? !forwardPhysical : forwardPhysical, threshold: CarouselRules.flickThreshold(scale: scale))
+        let stop = stops[index]
         let clamped = min(stop, maxScroll)
         target.rect.origin.x = rightToLeft ? maxScroll - clamped : clamped
     }
@@ -54,14 +69,14 @@ private struct CarouselSnap: ScrollTargetBehavior {
 
 extension View {
     @ViewBuilder
-    fileprivate func carouselSnap(stops: [Double], rightToLeft: Bool) -> some View {
+    fileprivate func carouselSnap(stops: [Double], rightToLeft: Bool, scale: Double, current: CurrentOffset) -> some View {
         if #available(iOS 17.0, macOS 14.0, *) {
             // On the scroll view itself: the behavior of a scroll view is read from the view it
             // modifies, and on the content inside it nothing reads it (the scroll never snapped).
-            self.scrollTargetBehavior(CarouselSnap(stops: stops, rightToLeft: rightToLeft))
+            self.scrollTargetBehavior(CarouselSnap(stops: stops, rightToLeft: rightToLeft, scale: scale, current: current))
         } else {
             #if canImport(UIKit)
-            self.background(LegacySnapInstaller(stops: stops, rightToLeft: rightToLeft))
+            self.background(LegacySnapInstaller(stops: stops, rightToLeft: rightToLeft, scale: scale))
             #else
             self
             #endif
@@ -82,6 +97,8 @@ struct CarouselView<Card: View>: View {
     @State private var widths: [Int: CGFloat] = [:]
     @State private var offset: CGFloat = 0
     @State private var restored = false
+    @State private var current = CurrentOffset()
+    @Environment(\.displayScale) private var displayScale
 
     private static var space: String { "hotlayout.carousel" }
 
@@ -144,7 +161,7 @@ struct CarouselView<Card: View>: View {
                 }
                 .overlay(alignment: .leading) { anchors(plan) }
             }
-            .carouselSnap(stops: plan.stops, rightToLeft: setup.rightToLeft)
+            .carouselSnap(stops: plan.stops, rightToLeft: setup.rightToLeft, scale: Double(displayScale), current: current)
             .coordinateSpace(name: Self.space)
             .background(GeometryReader { geometry in Color.clear.preference(key: ViewportKey.self, value: geometry.size.width) })
             .onPreferenceChange(ViewportKey.self) { measuredViewport = $0 }
@@ -152,6 +169,7 @@ struct CarouselView<Card: View>: View {
             .onPreferenceChange(OffsetKey.self) { value in
                 guard let value else { return }
                 offset = value
+                current.value = Double(value)
                 if restored { remember(CarouselRules.activeStop(plan.stops, offset: Double(value))) }
             }
             .onChange(of: plan) { restore($0, proxy: proxy) }
@@ -243,6 +261,7 @@ import UIKit
 private struct LegacySnapInstaller: UIViewRepresentable {
     var stops: [Double]
     var rightToLeft: Bool
+    var scale: Double
 
     func makeCoordinator() -> LegacySnap { LegacySnap() }
 
@@ -255,6 +274,7 @@ private struct LegacySnapInstaller: UIViewRepresentable {
     func updateUIView(_ view: UIView, context: Context) {
         context.coordinator.stops = stops
         context.coordinator.rightToLeft = rightToLeft
+        context.coordinator.scale = scale
         DispatchQueue.main.async { context.coordinator.attach(from: view) }
     }
 }
@@ -262,6 +282,7 @@ private struct LegacySnapInstaller: UIViewRepresentable {
 private final class LegacySnap: NSObject {
     var stops: [Double] = []
     var rightToLeft = false
+    var scale = 1.0
     private weak var scrollView: UIScrollView?
 
     func attach(from view: UIView) {
@@ -285,7 +306,11 @@ private final class LegacySnap: NSObject {
         // The finger moves with the content, so a leftward drag (negative velocity) advances.
         let direction = rightToLeft ? -1.0 : 1.0
         let projected = logical - direction * Double(velocity) * 0.12
-        let stop = min(stops[CarouselRules.activeStop(stops, offset: projected)], maxScroll)
+        // The finger moves with the content: a leftward drag (negative velocity) advances.
+        let index = CarouselRules.releaseStop(
+            stops, offset: logical, landing: projected, speed: abs(Double(velocity)), forward: direction * Double(velocity) < 0,
+            threshold: CarouselRules.flickThreshold(scale: scale))
+        let stop = min(stops[index], maxScroll)
         let target = rightToLeft ? maxScroll - stop : stop
         scrollView.setContentOffset(CGPoint(x: target + scrollView.adjustedContentInset.left, y: scrollView.contentOffset.y), animated: true)
     }

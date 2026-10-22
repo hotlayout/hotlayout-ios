@@ -22,6 +22,10 @@ Drawing:
 
 Behaviour:
 
+- **Carousel flick.** A fast flick moves the carousel one stop in the direction of the throw (clamped
+  to the first and last stop), as in the other readers; before, the stop nearest to where the
+  momentum would land was taken, so a flick could skip a card. A slower release still settles on
+  the nearest stop. The flick threshold is Flutter's, `1 / (0.05 * pixel ratio)` points per second.
 - **Sheet drag.** A drag down on a sheet whose body is scrolled scrolls the body back first and
   moves the sheet only once the body is at its top (`x-sheetDismiss`): the sheet now hears the
   offset from the scroll view of the body, the same reading as the scrolled look of the app bar.
