@@ -109,4 +109,142 @@ final class PlacementCasesTests: XCTestCase {
             XCTAssertEqual(showing.report?.rawValue, expected["report"]?.stringValue, "\(name): report")
         }
     }
+
+    // MARK: - reading the bytes, the transport, the events, the memory
+
+    /// The bytes of a row: parts joined in order, `text` as UTF-8, `hex` as raw bytes, `times` repeating.
+    private func bytes(_ parts: JSONValue?) -> Data {
+        var out = Data()
+        for part in (parts?.arrayValue ?? []).compactMap(\.objectValue) {
+            var piece = Data()
+            if let text = part["text"]?.stringValue {
+                piece = Data(text.utf8)
+            } else if let hex = part["hex"]?.stringValue {
+                var index = hex.startIndex
+                while index < hex.endIndex {
+                    let next = hex.index(index, offsetBy: 2)
+                    piece.append(UInt8(hex[index..<next], radix: 16)!)
+                    index = next
+                }
+            }
+            for _ in 0..<(part["times"].flatMap { $0.numberValue.map(Int.init) } ?? 1) { out.append(piece) }
+        }
+        return out
+    }
+
+    func testBodyCases() throws {
+        let rows = Contract.rows(try table(), "bodyCases")
+        XCTAssertEqual(rows.count, 26)
+        for row in rows {
+            let name = row["name"]?.stringValue ?? "?"
+            let map = HotlayoutPlacementMap(data: bytes(row["body"]))
+            XCTAssertEqual(readingName(map.reading), row["read"]?.stringValue, name)
+            _ = assertResolves(map, row["resolve"]?.arrayValue ?? [], name)
+        }
+    }
+
+    func testTransportCases() throws {
+        let rows = Contract.rows(try table(), "transportCases")
+        XCTAssertEqual(rows.count, 26)
+        for row in rows {
+            let name = row["name"]?.stringValue ?? "?"
+            let answer = row["answer"]?.objectValue ?? JSONObject()
+            let reply = PlacementReply(
+                status: answer["status"]?.numberValue.map(Int.init) ?? 0, body: bytes(answer["body"]),
+                completedAtMs: answer["completedAtMs"]?.numberValue.map(Int.init)
+            )
+            let actual: String
+            if row["request"]?.stringValue == "map" {
+                switch PlacementAnswer.map(reply) {
+                case .map: actual = "map"
+                case .corrupt: actual = "corrupt"
+                case .notModified: actual = "notModified"
+                case .notFound: actual = "notFound"
+                case .offline: actual = "offline"
+                }
+            } else {
+                switch PlacementAnswer.document(reply) {
+                case .read: actual = "read"
+                case .notModified: actual = "notModified"
+                case .missing: actual = "missing"
+                case .unreadable: actual = "unreadable"
+                }
+            }
+            XCTAssertEqual(actual, row["expected"]?.stringValue, name)
+        }
+    }
+
+    func testEventCases() throws {
+        let rows = Contract.rows(try table(), "eventCases")
+        XCTAssertEqual(rows.count, 8)
+        func event(_ state: JSONObject) -> HotlayoutPlacementEvent {
+            HotlayoutPlacementEvent(
+                status: state["status"]?.stringValue ?? "",
+                report: state["report"]?.stringValue.flatMap(HotlayoutPlacementReport.init(rawValue:)),
+                mapStatus: HotlayoutPlacementMapStatus(rawValue: state["mapStatus"]?.stringValue ?? "") ?? .offline,
+                documentId: state["documentId"]?.stringValue, entry: state["entry"]?.stringValue
+            )
+        }
+        for row in rows {
+            let name = row["name"]?.stringValue ?? "?"
+            var tracker = PlacementEventTracker()
+            let told = (row["states"]?.arrayValue ?? []).compactMap(\.objectValue).compactMap { tracker.next(event($0)) }
+            let expected = (row["events"]?.arrayValue ?? []).compactMap(\.objectValue).map(event)
+            XCTAssertEqual(told, expected, name)
+        }
+    }
+
+    private final class Hub: @unchecked Sendable {
+        private let lock = NSLock()
+        private var items: [String: (Int, Data)] = [:]
+        func put(_ path: String, _ status: Int, _ body: Data = Data()) { lock.lock(); items[path] = (status, body); lock.unlock() }
+        func clear() { lock.lock(); items = [:]; lock.unlock() }
+        func get(_ path: String) -> (Int, Data)? { lock.lock(); defer { lock.unlock() }; return items[path] }
+    }
+
+    func testCacheCases() async throws {
+        let rows = Contract.rows(try table(), "cacheCases")
+        XCTAssertEqual(rows.count, 3)
+        let hub = Hub()
+        let server = try LocalServer { request in
+            guard let (status, body) = hub.get(request.path) else { return LocalServer.Response(status: 404, headers: ["Content-Length": "0"]) }
+            if status != 200 { return LocalServer.Response(status: status, headers: ["Content-Length": "0"]) }
+            return .data(body, type: "application/json")
+        }
+        defer { server.stop() }
+        let document = #"""
+            {"schemaVersion":"9.27.0","documentId":"d1","name":"n","initialScreenId":"a","entryPoints":{},
+             "screens":[{"screenId":"a","name":"A","root":{"id":"r","type":"Screen","props":{},"children":[]}}]}
+            """#
+        for row in rows {
+            let name = row["name"]?.stringValue ?? "?"
+            let store = HotlayoutMemoryPlacementStore()
+            let documents = HotlayoutMemoryPlacementDocumentStore()
+            for (index, step) in (row["steps"]?.arrayValue ?? []).compactMap(\.objectValue).enumerated() {
+                hub.clear()
+                let project = step["project"]?.stringValue ?? "?"
+                let root = "/orgs/o/projects/\(project)"
+                let map = step["map"]?.objectValue ?? JSONObject()
+                if map["kind"]?.stringValue == "map" {
+                    hub.put(root + "/placements/published.json", 200, Data((map["text"]?.stringValue ?? "").utf8))
+                } else {
+                    hub.put(root + "/placements/published.json", 503)
+                }
+                switch step["document"]?.stringValue {
+                case "ok": hub.put(root + "/documents/d1/published.json", 200, Data(document.utf8))
+                case "notFound": hub.put(root + "/documents/d1/published.json", 404)
+                case "offline": hub.put(root + "/documents/d1/published.json", 503)
+                default: break
+                }
+                let placement = await HotlayoutPlacement.load(
+                    name: "home.banner", projectBase: URL(string: server.base + root)!, store: store, documents: documents
+                )
+                let expected = step["expected"]?.objectValue ?? JSONObject()
+                let event = placement.event
+                XCTAssertEqual(event.status, expected["status"]?.stringValue, "\(name) / step \(index): status")
+                XCTAssertEqual(event.report?.rawValue, expected["report"]?.stringValue, "\(name) / step \(index): report")
+                XCTAssertEqual(event.mapStatus.rawValue, expected["mapStatus"]?.stringValue, "\(name) / step \(index): mapStatus")
+            }
+        }
+    }
 }

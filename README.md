@@ -179,8 +179,11 @@ draws nothing says why in `placement.report`:
 version) or `notPublished` (404). A name is lowercase Latin letters and digits in dot-separated
 segments; a name of another form is `unknown` and no request is made for it. Use
 `HotlayoutPlacementView(name:projectBase:…content:)` to draw with a `HotlayoutScreen` of your own
-configuration, and `store:` / `session:` to choose where the last known copies live and how the
-requests are made. The view loads once per name; it does not poll.
+configuration, and `store:` (the last known map), `documents:` (the documents read, files in the caches directory
+by default) and `session:` to choose where the last known copies live and how the requests are
+made. Redirects are not followed and a request is given up after 20 seconds. The view loads once
+per name; it does not poll. `onPlacement` is called with the first state and again whenever
+`placement.event` (`status`, `report`, `mapStatus`, `documentId`, `entry`) changes.
 
 ## What the reader does and does not do
 

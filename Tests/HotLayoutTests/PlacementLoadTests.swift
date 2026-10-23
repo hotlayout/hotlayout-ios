@@ -50,8 +50,14 @@ final class PlacementLoadTests: XCTestCase {
         """#
     }
 
+    /// The documents kept by a store given to `load`, by store: one per test.
+    private var documentStores: [ObjectIdentifier: HotlayoutMemoryPlacementDocumentStore] = [:]
+
     private func load(_ name: String, _ base: URL, store: HotlayoutPlacementStore, bundled: String? = nil) async -> HotlayoutPlacement {
-        await HotlayoutPlacement.load(name: name, projectBase: base, bundledMap: bundled, store: store)
+        let id = ObjectIdentifier(store as AnyObject)
+        let documents = documentStores[id] ?? HotlayoutMemoryPlacementDocumentStore()
+        documentStores[id] = documents
+        return await HotlayoutPlacement.load(name: name, projectBase: base, bundledMap: bundled, store: store, documents: documents)
     }
 
     func testPlacesADocumentAndStartsAtItsEntry() async throws {
@@ -187,7 +193,7 @@ final class PlacementLoadTests: XCTestCase {
         let newer = await load("home.banner", base, store: store)
         XCTAssertEqual(newer.mapStatus, .unsupported)
         XCTAssertNotNil(newer.document)
-        XCTAssertEqual(store.value(forKey: "\(base.absoluteString)#map")?.contains("d1"), true, "only a fresh map is kept")
+        XCTAssertEqual(store.value(forKey: "\(base.absoluteString)/placements/published.json")?.contains("d1"), true, "only a fresh map is kept")
     }
 
     func testAGoneDocumentIsNotBroughtBackFromTheCopy() async throws {

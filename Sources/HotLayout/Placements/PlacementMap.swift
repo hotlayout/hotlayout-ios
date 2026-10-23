@@ -50,17 +50,15 @@ public struct HotlayoutPlacementMap: Equatable, Sendable {
     public let reading: Reading
     let places: JSONObject
 
-    /// Reads the text of the file. Text that is not JSON is `corrupt`, not an error.
+    /// Reads the text of the file; see `init(data:)`. Text that is not JSON is `corrupt`, not an error.
     public init(text: String) {
-        guard let json = try? JSONValue.parse(text) else {
-            self.init(reading: .corrupt, places: [:])
-            return
-        }
-        self.init(json: json)
+        self.init(data: Data(text.utf8))
     }
 
+    /// Reads the bytes of the file. A body over 262 144 bytes, one that is not strict UTF-8 or one
+    /// nested deeper than 32 levels is `corrupt`; one leading byte order mark is skipped.
     public init(data: Data) {
-        guard let json = try? JSONValue.parse(data) else {
+        guard let text = PlacementBody.text(of: data), let json = try? JSONValue.parse(text) else {
             self.init(reading: .corrupt, places: [:])
             return
         }
@@ -90,6 +88,12 @@ public struct HotlayoutPlacementMap: Equatable, Sendable {
     private init(reading: Reading, places: JSONObject) {
         self.reading = reading
         self.places = places
+    }
+
+    /// The ids of the documents the places of this map name (the ones of a readable form).
+    func documentIds() -> Set<String> {
+        guard reading == .map else { return [] }
+        return Set(places.keys.compactMap { resolve($0).documentId })
     }
 
     /// What stands in the place `name`.
@@ -160,24 +164,21 @@ enum PlacementForms {
     }
 }
 
-/// `MAJOR.MINOR.PATCH` with no sign, no space and no leading zero.
+/// `MAJOR.MINOR.PATCH` with no sign, no space and no leading zero. The parts stay digit strings:
+/// a major is compared as text, so a long number is another major and never wraps around.
 struct PlacementVersion: Equatable {
-    let major: Int
-    let minor: Int
-    let patch: Int
+    let major: String
+    let minor: String
+    let patch: String
 
     init?(_ text: String) {
         let parts = text.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 3 else { return nil }
-        var numbers: [Int] = []
         for part in parts {
-            guard !part.isEmpty, part.utf8.count <= 9, part.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }),
-                part == "0" || part.first != "0", let number = Int(part)
-            else { return nil }
-            numbers.append(number)
+            guard !part.isEmpty, part.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }), part == "0" || part.first != "0" else { return nil }
         }
-        major = numbers[0]
-        minor = numbers[1]
-        patch = numbers[2]
+        major = String(parts[0])
+        minor = String(parts[1])
+        patch = String(parts[2])
     }
 }

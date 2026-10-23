@@ -4,18 +4,26 @@ import SwiftUI
 /// empty, unknown or unreadable. See `HotlayoutPlacement.load` for where it comes from.
 ///
 /// The place is loaded once per `name` and `projectBase`; the view does not poll. What the view
-/// does not draw it reports: `onPlacement` is called with the result of every load, so the host
-/// can show its own fallback when `placement.document` is `nil`.
+/// does not draw it reports: `onPlacement` is called with the first settled state of a place and
+/// with every change of `placement.event` after it, so the host can show its own fallback when
+/// `placement.document` is `nil` and take it away when the document comes back. When the name or
+/// the project changes, the old place is dropped at once and the new one is reported afresh.
 public struct HotlayoutPlacementView<Content: View>: View {
     let name: String
     let projectBase: URL
     let bundledMap: String?
     let store: HotlayoutPlacementStore
+    let documents: HotlayoutPlacementDocumentStore
     let session: URLSession?
     let onPlacement: ((HotlayoutPlacement) -> Void)?
     let content: (HotlayoutDocument, String?) -> Content
 
     @State private var placement: HotlayoutPlacement?
+    @State private var events = EventBox()
+
+    private final class EventBox {
+        var tracker = PlacementEventTracker()
+    }
 
     /// Draws the placed document with a screen of your own making.
     ///
@@ -26,6 +34,7 @@ public struct HotlayoutPlacementView<Content: View>: View {
         projectBase: URL,
         bundledMap: String? = nil,
         store: HotlayoutPlacementStore = HotlayoutUserDefaultsPlacementStore(),
+        documents: HotlayoutPlacementDocumentStore = HotlayoutFilePlacementDocumentStore(),
         session: URLSession? = nil,
         onPlacement: ((HotlayoutPlacement) -> Void)? = nil,
         @ViewBuilder content: @escaping (HotlayoutDocument, String?) -> Content
@@ -34,6 +43,7 @@ public struct HotlayoutPlacementView<Content: View>: View {
         self.projectBase = projectBase
         self.bundledMap = bundledMap
         self.store = store
+        self.documents = documents
         self.session = session
         self.onPlacement = onPlacement
         self.content = content
@@ -49,9 +59,16 @@ public struct HotlayoutPlacementView<Content: View>: View {
             }
         }
         .task(id: "\(projectBase.absoluteString)\n\(name)") {
-            let loaded = await HotlayoutPlacement.load(name: name, projectBase: projectBase, bundledMap: bundledMap, store: store, session: session)
+            // Another place: what was drawn belongs to the old one.
+            placement = nil
+            events.tracker.reset()
+            let loaded = await HotlayoutPlacement.load(
+                name: name, projectBase: projectBase, bundledMap: bundledMap, store: store, documents: documents, session: session
+            )
+            // A task that was replaced or cancelled while it loaded must not write.
+            guard !Task.isCancelled else { return }
             placement = loaded
-            onPlacement?(loaded)
+            if events.tracker.next(loaded.event) != nil { onPlacement?(loaded) }
         }
     }
 }
@@ -64,6 +81,7 @@ extension HotlayoutPlacementView where Content == HotlayoutScreen {
         projectBase: URL,
         bundledMap: String? = nil,
         store: HotlayoutPlacementStore = HotlayoutUserDefaultsPlacementStore(),
+        documents: HotlayoutPlacementDocumentStore = HotlayoutFilePlacementDocumentStore(),
         session: URLSession? = nil,
         theme: HotlayoutThemeSet = .builtIn,
         data: DataScope = [:],
@@ -75,7 +93,7 @@ extension HotlayoutPlacementView where Content == HotlayoutScreen {
         onPlacement: ((HotlayoutPlacement) -> Void)? = nil
     ) {
         self.init(
-            name: name, projectBase: projectBase, bundledMap: bundledMap, store: store, session: session, onPlacement: onPlacement
+            name: name, projectBase: projectBase, bundledMap: bundledMap, store: store, documents: documents, session: session, onPlacement: onPlacement
         ) { document, entry in
             HotlayoutScreen(
                 document: document, theme: theme, data: data, locale: locale, entry: entry,

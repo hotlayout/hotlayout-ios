@@ -5,9 +5,8 @@ import XCTest
 /// Adversarial pass over placements: the placement map and the documents it names come from the
 /// network, so they are untrusted input.
 ///
-/// Tests wrapped in `XCTExpectFailure` are FINDINGS: they state what should hold and currently does
-/// not; a fix removes the wrapper. The other tests are GUARDS: paths around the claims that were
-/// tried and did not work.
+/// The first group are the findings of the audit, now fixed; the second are GUARDS: paths around
+/// the claims that were tried and did not work.
 final class PlacementAdversarialTests: XCTestCase {
     private var servers: [LocalServer] = []
     private final class Files: @unchecked Sendable {
@@ -41,12 +40,12 @@ final class PlacementAdversarialTests: XCTestCase {
     // MARK: - findings
 
     func testAMajorTooLongForNineDigitsIsUnsupportedAsInTheReference() {
-        XCTExpectFailure("adversary: PlacementVersion refuses parts longer than 9 digits, so a 10-digit major reads as corrupt; the reference (and React, Android) say unsupported") {
-            XCTAssertEqual(HotlayoutPlacementMap(text: #"{"placementsVersion":"1234567890.0.0","placements":{}}"#).reading, .unsupported)
-        }
-        // A 10-digit MINOR of major 1 is a readable map in the reference; here it is corrupt.
-        XCTExpectFailure("adversary: same 9-digit cap on the minor") {
-            XCTAssertEqual(HotlayoutPlacementMap(text: #"{"placementsVersion":"1.1234567890.0","placements":{}}"#).reading, .map)
+        XCTAssertEqual(HotlayoutPlacementMap(text: #"{"placementsVersion":"1234567890.0.0","placements":{}}"#).reading, .unsupported)
+        // A 10-digit MINOR of major 1 is a readable map.
+        XCTAssertEqual(HotlayoutPlacementMap(text: #"{"placementsVersion":"1.1234567890.0","placements":{}}"#).reading, .map)
+        // A major that would wrap around to 1 in a 32- or 64-bit integer is still another major.
+        for major in ["4294967297", "18446744073709551617", "1000000000000000000000001"] {
+            XCTAssertEqual(HotlayoutPlacementMap(text: #"{"placementsVersion":"\#(major).0.0","placements":{}}"#).reading, .unsupported, major)
         }
     }
 
@@ -56,15 +55,45 @@ final class PlacementAdversarialTests: XCTestCase {
         files.put("/orgs/o/projects/p/documents/d2/published.json", document)
         let (base, _) = try start(files)
         let store = HotlayoutMemoryPlacementStore()
-        files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d1"}"#))
-        _ = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store)
-        files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d2"}"#))
-        _ = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store)
-        // Every document id a map ever named stays in the store (UserDefaults by default, up to 8 MB
-        // each, no eviction): a map that rotates ids grows the app's defaults without bound.
-        XCTExpectFailure("adversary: the per-document cache under \"<base>#document.<id>\" is never pruned") {
-            XCTAssertNil(store.value(forKey: "\(base.absoluteString)#document.d1"))
+        let documents = HotlayoutMemoryPlacementDocumentStore()
+        func load() async -> HotlayoutPlacement {
+            await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store, documents: documents)
         }
+        files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d1"}"#))
+        _ = await load()
+        let d1 = base.absoluteString + "/documents/d1/published.json"
+        let d2 = base.absoluteString + "/documents/d2/published.json"
+        XCTAssertEqual(documents.keys(), [d1])
+        files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d2"}"#))
+        _ = await load()
+        XCTAssertEqual(documents.keys(), [d2], "one document for the place, and none for an id the map dropped")
+        // A document of another project is not touched by this project's pruning.
+        let other = "https://other.example/documents/x/published.json"
+        documents.setDocument(HotlayoutPlacementCachedDocument(data: Data("x".utf8), etag: nil), forKey: other)
+        files.put("/orgs/o/projects/p/placements/published.json", map(""))
+        _ = await load()
+        XCTAssertEqual(documents.keys(), [other])
+    }
+
+    func testDocumentsLiveInFilesAndNotInUserDefaults() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hl-placements-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = Files()
+        files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d1"}"#))
+        files.put("/orgs/o/projects/p/documents/d1/published.json", document)
+        let (base, _) = try start(files)
+        let store = HotlayoutMemoryPlacementStore()
+        let documents = HotlayoutFilePlacementDocumentStore(directory: directory)
+        let first = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store, documents: documents)
+        XCTAssertNotNil(first.document)
+        XCTAssertNil(store.value(forKey: base.absoluteString + "/documents/d1/published.json"))
+        XCTAssertEqual(documents.keys(), [base.absoluteString + "/documents/d1/published.json"])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 2)
+        // A new store object over the same directory reads the copy.
+        let reopened = HotlayoutFilePlacementDocumentStore(directory: directory)
+        XCTAssertEqual(reopened.document(forKey: base.absoluteString + "/documents/d1/published.json")?.data, Data(document.utf8))
+        reopened.setDocument(nil, forKey: base.absoluteString + "/documents/d1/published.json")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 0)
     }
 
     func testTheMapDoesNotFollowARedirectToAnotherHost() async throws {
@@ -75,11 +104,36 @@ final class PlacementAdversarialTests: XCTestCase {
             request.path.hasSuffix("/placements/published.json") ? .redirect(otherBase.absoluteString.replacingOccurrences(of: "/orgs/o/projects/p", with: "") + "/placements/published.json") : LocalServer.Response(status: 404, headers: ["Content-Length": "0"])
         }
         servers.append(redirecting)
-        let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: URL(string: redirecting.base + "/orgs/o/projects/p")!, store: HotlayoutMemoryPlacementStore())
-        XCTExpectFailure("adversary: URLSession follows a cross-origin redirect for the map (Android refuses redirects and reads it as offline)") {
-            XCTAssertTrue(other.requests.isEmpty)
-            XCTAssertEqual(placement.mapStatus, .offline)
+        let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: URL(string: redirecting.base + "/orgs/o/projects/p")!, store: HotlayoutMemoryPlacementStore(), documents: HotlayoutMemoryPlacementDocumentStore())
+        XCTAssertTrue(other.requests.isEmpty)
+        XCTAssertEqual(placement.mapStatus, .offline)
+    }
+
+    func testARedirectWithinTheSameHostIsNotFollowedEither() async throws {
+        let files = Files()
+        files.put("/elsewhere/map.json", map(#""home.banner":{"documentId":null}"#))
+        let server = try LocalServer { request in
+            if request.path == "/orgs/o/projects/p/placements/published.json" { return .redirect("/elsewhere/map.json") }
+            return files.get(request.path).map { .data(Data($0.utf8), type: "application/json") } ?? LocalServer.Response(status: 404, headers: ["Content-Length": "0"])
         }
+        servers.append(server)
+        let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: URL(string: server.base + "/orgs/o/projects/p")!, store: HotlayoutMemoryPlacementStore(), documents: HotlayoutMemoryPlacementDocumentStore())
+        XCTAssertEqual(placement.mapStatus, .offline)
+        XCTAssertFalse(server.requests.contains { $0.path == "/elsewhere/map.json" })
+    }
+
+    func testADocumentThatRedirectsIsUnreadable() async throws {
+        let files = Files()
+        files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d1"}"#))
+        files.put("/elsewhere/doc.json", document)
+        let server = try LocalServer { request in
+            if request.path == "/orgs/o/projects/p/documents/d1/published.json" { return .redirect("/elsewhere/doc.json") }
+            return files.get(request.path).map { .data(Data($0.utf8), type: "application/json") } ?? LocalServer.Response(status: 404, headers: ["Content-Length": "0"])
+        }
+        servers.append(server)
+        let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: URL(string: server.base + "/orgs/o/projects/p")!, store: HotlayoutMemoryPlacementStore(), documents: HotlayoutMemoryPlacementDocumentStore())
+        XCTAssertEqual(placement.report, .documentUnreadable)
+        XCTAssertFalse(server.requests.contains { $0.path == "/elsewhere/doc.json" })
     }
 
     // MARK: - guards
@@ -91,7 +145,7 @@ final class PlacementAdversarialTests: XCTestCase {
             let encoded = String(data: try JSONSerialization.data(withJSONObject: [id], options: [.fragmentsAllowed]), encoding: .utf8)!.dropFirst().dropLast()
             files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":\#(encoded)}"#))
             let (base, server) = try start(files)
-            let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: HotlayoutMemoryPlacementStore())
+            let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: HotlayoutMemoryPlacementStore(), documents: HotlayoutMemoryPlacementDocumentStore())
             XCTAssertEqual(placement.resolution.status, .unreadable, id)
             XCTAssertEqual(server.requests.map(\.path), ["/orgs/o/projects/p/placements/published.json"], id)
         }
@@ -124,17 +178,16 @@ final class PlacementAdversarialTests: XCTestCase {
     func testDeepJSONDoesNotOverflowTheStack() {
         let depth = 100_000
         let text = #"{"placementsVersion":"1.0.0","placements":{},"x":"# + String(repeating: "[", count: depth) + String(repeating: "]", count: depth) + "}"
-        // Cross-reader note: the depth cap (256) makes this corrupt here and on Android; React and Flutter read a map.
         XCTAssertEqual(HotlayoutPlacementMap(text: text).reading, .corrupt)
     }
 
-    func testABodyWithAByteOrderMark() async throws {
-        // Cross-reader note: corrupt here and on Android; React and Flutter strip the BOM and read a map.
+    func testABodyWithOneByteOrderMarkIsRead() async throws {
         let files = Files()
         files.put("/orgs/o/projects/p/placements/published.json", "\u{FEFF}" + map(#""home.banner":{"documentId":null}"#))
         let (base, _) = try start(files)
-        let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: HotlayoutMemoryPlacementStore())
-        XCTAssertEqual(placement.mapStatus, .corrupt)
+        let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: HotlayoutMemoryPlacementStore(), documents: HotlayoutMemoryPlacementDocumentStore())
+        XCTAssertEqual(placement.mapStatus, .fresh)
+        XCTAssertEqual(placement.report, .empty)
     }
 
     func testTheLastKnownMapIsScopedByProject() async throws {
@@ -143,8 +196,8 @@ final class PlacementAdversarialTests: XCTestCase {
         let (baseA, _) = try start(filesA)
         let (baseB, _) = try start(Files())
         let store = HotlayoutMemoryPlacementStore()
-        _ = await HotlayoutPlacement.load(name: "home.banner", projectBase: baseA, store: store)
-        let b = await HotlayoutPlacement.load(name: "home.banner", projectBase: baseB, store: store)
+        _ = await HotlayoutPlacement.load(name: "home.banner", projectBase: baseA, store: store, documents: HotlayoutMemoryPlacementDocumentStore())
+        let b = await HotlayoutPlacement.load(name: "home.banner", projectBase: baseB, store: store, documents: HotlayoutMemoryPlacementDocumentStore())
         XCTAssertEqual(b.mapStatus, .notPublished)
         XCTAssertEqual(b.resolution.status, .unknown)
     }
@@ -156,9 +209,9 @@ final class PlacementAdversarialTests: XCTestCase {
             if let answer { files.put("/orgs/o/projects/p/placements/published.json", answer) }
             let (base, _) = try start(files)
             let store = HotlayoutMemoryPlacementStore()
-            store.set(good, forKey: "\(base.absoluteString)#map")
-            let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store)
-            XCTAssertEqual(store.value(forKey: "\(base.absoluteString)#map"), good)
+            store.set(good, forKey: "\(base.absoluteString)/placements/published.json")
+            let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store, documents: HotlayoutMemoryPlacementDocumentStore())
+            XCTAssertEqual(store.value(forKey: "\(base.absoluteString)/placements/published.json"), good)
             XCTAssertEqual(placement.resolution.status, .empty)
         }
     }
@@ -168,9 +221,31 @@ final class PlacementAdversarialTests: XCTestCase {
         files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d1"}"#))
         let (base, _) = try start(files)
         let store = HotlayoutMemoryPlacementStore()
-        store.set(document, forKey: "\(base.absoluteString)#document.d1")
-        let missing = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store)
+        let documents = HotlayoutMemoryPlacementDocumentStore()
+        let key = base.absoluteString + "/documents/d1/published.json"
+        documents.setDocument(HotlayoutPlacementCachedDocument(data: Data(document.utf8), etag: nil), forKey: key)
+        let missing = await HotlayoutPlacement.load(name: "home.banner", projectBase: base, store: store, documents: documents)
         XCTAssertEqual(missing.report, .documentMissing)
-        XCTAssertNil(store.value(forKey: "\(base.absoluteString)#document.d1"))
+        XCTAssertNil(documents.document(forKey: key))
+    }
+
+    func testABodyThatNeverEndsIsNoAnswerAfterTheDeadline() async throws {
+        let stalled = try LocalServer { _ in
+            var sent = false
+            let chunks = AnyIterator<Data> {
+                if !sent { sent = true; return Data("{".utf8) }
+                Thread.sleep(forTimeInterval: 5)
+                return nil
+            }
+            return LocalServer.Response(status: 200, headers: ["Content-Type": "application/json"], chunks: chunks)
+        }
+        servers.append(stalled)
+        var transport = PlacementTransport(session: PlacementTransport.defaultSession())
+        transport.deadline = .milliseconds(300)
+        let started = Date()
+        let reply = await transport.get(URL(string: stalled.base + "/map.json")!, etag: nil, maxBytes: PlacementBody.maxBytes)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 3)
+        XCTAssertNil(reply.completedAtMs)
+        XCTAssertEqual(PlacementAnswer.map(reply), .offline)
     }
 }

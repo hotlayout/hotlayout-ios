@@ -20,52 +20,59 @@ public struct HotlayoutPlacement: Sendable {
     /// Loads a place.
     ///
     /// The map is `placements/published.json` under `projectBase`, asked with its `ETag`; the
-    /// answer is used when it is readable and kept as the last known map. When the network gives
-    /// no readable map, the last known map is used, then `bundledMap` (the text of a copy
-    /// shipped with the app). The document is `documents/{documentId}/published.json` under the
-    /// same base, with the same rules; a document the network cannot give falls back on the last
-    /// one read, except after a 404, which means it is gone.
+    /// answer is used when it is readable and kept as the last known map (under the address of
+    /// the map, so one project's map never serves another). When the network gives no readable
+    /// map, the last known map is used, then `bundledMap` (the text of a copy shipped with the
+    /// app). The document is `documents/{documentId}/published.json` under the same base, with
+    /// the same rules; a document the network cannot give falls back on the last one read, except
+    /// after a 404, which means it is gone.
+    ///
+    /// A request that is redirected, or that is not finished 20 seconds after it started, is no
+    /// answer. A map is read up to 262 144 bytes, a document up to 8 MB.
+    ///
+    /// Documents are kept for the places the map in use names, one for each, and the others are
+    /// removed after a fresh map is read.
     ///
     /// Never throws: every failure is a `report`.
     ///
     /// - Parameters:
     ///   - projectBase: the base address of the project in the storage.
     ///   - bundledMap: the text of a map shipped with the app, for a first start without a network.
-    ///   - store: where the last known map and documents are kept; `UserDefaults` by default.
-    ///   - session: the session to ask with; an ephemeral one with a 15-second limit by default.
+    ///   - store: where the last known map is kept; `UserDefaults` by default.
+    ///   - documents: where the documents read last are kept; files in the caches directory by default.
+    ///   - session: the session to ask with; an ephemeral one with a 20-second limit by default.
     public static func load(
         name: String,
         projectBase: URL,
         bundledMap: String? = nil,
         store: HotlayoutPlacementStore = HotlayoutUserDefaultsPlacementStore(),
+        documents: HotlayoutPlacementDocumentStore = HotlayoutFilePlacementDocumentStore(),
         session: URLSession? = nil
     ) async -> HotlayoutPlacement {
         let transport = PlacementTransport(session: session ?? PlacementTransport.defaultSession())
-        let scope = projectBase.absoluteString
-        let mapKey = "\(scope)#map"
+        let mapURL = projectBase.appendingPathComponent("placements").appendingPathComponent("published.json")
+        let mapKey = mapURL.absoluteString
         let lastKnown = store.value(forKey: mapKey)
         let lastKnownReadable = lastKnown.map { HotlayoutPlacementMap(text: $0).reading == .map } ?? false
-        let mapURL = projectBase.appendingPathComponent("placements").appendingPathComponent("published.json")
-        let answer = await transport.get(mapURL, etag: lastKnownReadable ? store.value(forKey: mapKey + ".etag") : nil)
+        let etag = lastKnownReadable ? store.value(forKey: mapKey + ".etag") : nil
+        let reply = await transport.get(mapURL, etag: etag, maxBytes: PlacementBody.maxBytes)
+        // A cancelled load changes nothing: the caller has moved on.
+        guard !Task.isCancelled else { return cancelled(name) }
 
-        let outcome: PlacementNetworkOutcome
-        switch answer.kind {
-        case .ok: outcome = .map(String(decoding: answer.body, as: UTF8.self))
-        case .notModified: outcome = .notModified
-        case .notFound: outcome = .notFound
-        case .failed: outcome = .offline
-        }
+        let outcome = PlacementAnswer.map(reply)
         let decision = PlacementSource.pick(network: outcome, lastKnown: lastKnown, bundled: bundledMap)
         if decision.remember, case .map(let text) = outcome {
             store.set(text, forKey: mapKey)
-            store.set(answer.etag, forKey: mapKey + ".etag")
+            store.set(reply.etag, forKey: mapKey + ".etag")
         }
 
         let resolution = decision.map.resolve(name)
+        if decision.status == .fresh { prune(documents, base: projectBase, keeping: decision.map.documentIds()) }
         var document: HotlayoutDocument?
         var documentOutcome: PlacementDocumentOutcome?
         if resolution.status == .document, let id = resolution.documentId {
-            let read = await loadDocument(id: id, base: projectBase, scope: scope, store: store, transport: transport)
+            let read = await loadDocument(id: id, base: projectBase, documents: documents, transport: transport)
+            guard !Task.isCancelled else { return cancelled(name) }
             document = read.document
             documentOutcome = read.outcome
         }
@@ -76,72 +83,68 @@ public struct HotlayoutPlacement: Sendable {
         )
     }
 
+    /// What a load that was cancelled returns; the caller drops it.
+    private static func cancelled(_ name: String) -> HotlayoutPlacement {
+        HotlayoutPlacement(
+            name: name, mapStatus: .offline, resolution: HotlayoutPlacementResolution(status: .unreadable),
+            document: nil, entry: nil, report: .unreadable
+        )
+    }
+
+    /// What the host is told about this state; see `HotlayoutPlacementEvent`.
+    public var event: HotlayoutPlacementEvent {
+        let shown = document != nil
+        return HotlayoutPlacementEvent(
+            status: shown ? "document" : "nothing", report: report, mapStatus: mapStatus,
+            documentId: shown ? resolution.documentId : nil, entry: shown ? entry : nil
+        )
+    }
+
     private static let documentMaxBytes = 8 * 1024 * 1024
 
+    private static func documentKey(_ id: String, base: URL) -> String {
+        documentURL(id, base: base).absoluteString
+    }
+
+    private static func documentURL(_ id: String, base: URL) -> URL {
+        base.appendingPathComponent("documents").appendingPathComponent(id).appendingPathComponent("published.json")
+    }
+
+    /// Removes the kept documents of this project that the map no longer names.
+    private static func prune(_ documents: HotlayoutPlacementDocumentStore, base: URL, keeping ids: Set<String>) {
+        let prefix = base.appendingPathComponent("documents").absoluteString + "/"
+        let keep = Set(ids.map { documentKey($0, base: base) })
+        for key in documents.keys() where key.hasPrefix(prefix) && !keep.contains(key) {
+            documents.setDocument(nil, forKey: key)
+        }
+    }
+
     private static func loadDocument(
-        id: String, base: URL, scope: String, store: HotlayoutPlacementStore, transport: PlacementTransport
+        id: String, base: URL, documents: HotlayoutPlacementDocumentStore, transport: PlacementTransport
     ) async -> (document: HotlayoutDocument?, outcome: PlacementDocumentOutcome) {
-        let key = "\(scope)#document.\(id)"
-        let kept = store.value(forKey: key).flatMap { text in (try? HotlayoutDocument.load(Data(text.utf8))).map { (text, $0) } }
-        let url = base.appendingPathComponent("documents").appendingPathComponent(id).appendingPathComponent("published.json")
-        let answer = await transport.get(url, etag: kept == nil ? nil : store.value(forKey: key + ".etag"))
+        let key = documentKey(id, base: base)
+        let kept = documents.document(forKey: key).flatMap { cached in (try? HotlayoutDocument.load(cached.data)).map { (cached, $0) } }
+        let reply = await transport.get(documentURL(id, base: base), etag: kept?.0.etag, maxBytes: documentMaxBytes)
         func outcome(_ document: HotlayoutDocument) -> (HotlayoutDocument?, PlacementDocumentOutcome) {
             (document, .ok(entryPoints: Set(document.entryPoints.keys)))
         }
-        switch answer.kind {
-        case .ok where answer.body.count <= documentMaxBytes:
-            if let document = try? HotlayoutDocument.load(answer.body) {
-                store.set(String(decoding: answer.body, as: UTF8.self), forKey: key)
-                store.set(answer.etag, forKey: key + ".etag")
+        switch PlacementAnswer.document(reply) {
+        case .read:
+            if reply.body.count <= documentMaxBytes, !Task.isCancelled, let document = try? HotlayoutDocument.load(reply.body) {
+                documents.setDocument(HotlayoutPlacementCachedDocument(data: reply.body, etag: reply.etag), forKey: key)
                 return outcome(document)
             }
         case .notModified:
             if let kept { return outcome(kept.1) }
-        case .notFound:
+        case .missing:
             // Gone: a copy kept from before must not bring it back.
-            store.set(nil, forKey: key)
-            store.set(nil, forKey: key + ".etag")
+            if !Task.isCancelled { documents.setDocument(nil, forKey: key) }
             return (nil, .missing)
-        default:
+        case .unreadable:
             break
         }
         // No answer, or one that is not a document: the last document read, else nothing.
         if let kept { return outcome(kept.1) }
         return (nil, .unreadable)
-    }
-}
-
-/// One GET with an optional `If-None-Match`.
-struct PlacementTransport: Sendable {
-    enum Kind { case ok, notModified, notFound, failed }
-    struct Answer {
-        let kind: Kind
-        let body: Data
-        let etag: String?
-    }
-
-    let session: URLSession
-
-    static func defaultSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 15
-        configuration.timeoutIntervalForResource = 30
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: configuration)
-    }
-
-    func get(_ url: URL, etag: String?) async -> Answer {
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
-        guard let (body, response) = try? await session.data(for: request), let http = response as? HTTPURLResponse else {
-            return Answer(kind: .failed, body: Data(), etag: nil)
-        }
-        switch http.statusCode {
-        case 200: return Answer(kind: .ok, body: body, etag: http.value(forHTTPHeaderField: "ETag"))
-        case 304: return Answer(kind: .notModified, body: Data(), etag: nil)
-        case 404: return Answer(kind: .notFound, body: Data(), etag: nil)
-        default: return Answer(kind: .failed, body: Data(), etag: nil)
-        }
     }
 }

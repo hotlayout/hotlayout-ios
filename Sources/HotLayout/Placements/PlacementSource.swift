@@ -19,6 +19,8 @@ public enum HotlayoutPlacementMapStatus: String, Equatable, Sendable {
 /// What the network said about the map file.
 enum PlacementNetworkOutcome: Equatable {
     case map(String)
+    /// An answer that cannot be a map: over the size limit, not strict UTF-8, or too deeply nested.
+    case corrupt
     case notModified
     case notFound
     case offline
@@ -43,6 +45,8 @@ enum PlacementSource {
             let read = HotlayoutPlacementMap(text: text)
             if read.reading == .map { return PlacementSourceDecision(source: .network, status: .fresh, remember: true, map: read) }
             return fallback(lastKnown: lastKnown, bundled: bundled, status: read.reading == .unsupported ? .unsupported : .corrupt)
+        case .corrupt:
+            return fallback(lastKnown: lastKnown, bundled: bundled, status: .corrupt)
         case .notModified:
             if let lastKnown {
                 let last = HotlayoutPlacementMap(text: lastKnown)
@@ -119,4 +123,82 @@ struct PlacementShowing: Equatable {
             return PlacementShowing(showsDocument: true, entry: nil, report: .entryMissing)
         }
     }
+}
+
+/// What one request to the project storage came back with: the status, the body and the time the
+/// body ended (`nil` when it never did).
+struct PlacementReply {
+    let status: Int
+    let body: Data
+    let completedAtMs: Int?
+    var etag: String? = nil
+}
+
+/// What the reader does with an answer. The deadline covers the request from its start to the end
+/// of the body; a redirect is never followed.
+enum PlacementAnswer {
+    /// The longest a request may take, in milliseconds.
+    static let deadlineMs = 20_000
+
+    private static func inTime(_ reply: PlacementReply) -> Bool {
+        guard let done = reply.completedAtMs else { return false }
+        return done <= deadlineMs
+    }
+
+    /// The answer about the map.
+    static func map(_ reply: PlacementReply) -> PlacementNetworkOutcome {
+        guard inTime(reply) else { return .offline }
+        switch reply.status {
+        case 200:
+            guard let text = PlacementBody.text(of: reply.body) else { return .corrupt }
+            return .map(text)
+        case 304: return .notModified
+        case 404: return .notFound
+        default: return .offline
+        }
+    }
+
+    enum Document: Equatable { case read, notModified, missing, unreadable }
+
+    /// The answer about a document; a body that is `read` still has to be a document.
+    static func document(_ reply: PlacementReply) -> Document {
+        guard inTime(reply) else { return .unreadable }
+        switch reply.status {
+        case 200: return .read
+        case 304: return .notModified
+        case 404: return .missing
+        default: return .unreadable
+        }
+    }
+}
+
+/// What the host is told about a place: the five fields, one event for each change of any.
+public struct HotlayoutPlacementEvent: Equatable, Sendable {
+    /// `document` or `nothing`.
+    public let status: String
+    public let report: HotlayoutPlacementReport?
+    public let mapStatus: HotlayoutPlacementMapStatus
+    public let documentId: String?
+    public let entry: String?
+
+    public init(status: String, report: HotlayoutPlacementReport?, mapStatus: HotlayoutPlacementMapStatus, documentId: String?, entry: String?) {
+        self.status = status
+        self.report = report
+        self.mapStatus = mapStatus
+        self.documentId = documentId
+        self.entry = entry
+    }
+}
+
+/// Tells a state once: the first settled state, then every change of any field of the event.
+struct PlacementEventTracker {
+    private var last: HotlayoutPlacementEvent?
+
+    mutating func next(_ event: HotlayoutPlacementEvent) -> HotlayoutPlacementEvent? {
+        guard event != last else { return nil }
+        last = event
+        return event
+    }
+
+    mutating func reset() { last = nil }
 }
