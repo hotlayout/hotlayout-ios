@@ -26,6 +26,15 @@ extension XCTestCase {
     }
 }
 
+extension XCTestCase {
+    /// Waits until `condition` holds (polled), up to `timeout` seconds; no fixed sleeps.
+    @discardableResult
+    func waitUntil(_ timeout: TimeInterval = 5, _ condition: @escaping () -> Bool) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+}
+
 extension XCUIApplication {
     /// Opens a modal screen the way a person does: by the control that leads to it.
     func openLayer(by button: String) {

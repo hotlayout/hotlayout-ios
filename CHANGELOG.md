@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 Placements:
 
@@ -18,10 +18,18 @@ Placements:
 
 Drawing:
 
+- **Navigation bar under the keyboard.** With the on-screen keyboard up, the navigation bar (fixed or
+  floating) stayed directly above it, because the system shrank the screen for the keyboard before the
+  reader's own rules ran. The screen now keeps its size, so the bar stays under the keyboard and only the
+  pinned block rides above it, as the contract says.
 - **Focused field above the keyboard.** The field with the keyboard, together with the helper or
   counter under it, is scrolled into the body area once the keyboard has shrunk the area (before,
   the scroll ran on focus, ahead of the keyboard, and the field could stay under it). A field that
-  is already in view does not move.
+  is already in view does not move. A person who scrolls the body while the reveal is repeating
+  keeps the position they chose.
+- **Modal layer and the keyboard.** A sheet or window lifts above the on-screen keyboard as a whole,
+  so a field in it is no longer covered by the keyboard (a tall sheet scrolls to the field, a short
+  one moves up).
 - **Glass over a light picture.** The material of the glass now follows the brightness of what
   lies around it on the screen, not the theme: glass over a light gradient on a dark theme (the
   round buttons and the tile of a reward hero) is light and keeps the colour under it, where the

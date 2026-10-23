@@ -236,6 +236,10 @@ public struct HotlayoutScreen: View {
             )
             .ignoresSafeArea(.all, edges: .vertical)
         }
+        // The screen keeps its size when the keyboard comes: the zones account for it themselves
+        // (the pinned block rides above it, the navigation bar stays under it), so the system
+        // must not shrink the area as well.
+        .ignoresSafeArea(.keyboard)
         .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight)
         .environment(\.glassOnDarkTheme, themeSet.theme(themeId).appearance == .dark)
         .environment(\.countdownClockPinned, now != nil)

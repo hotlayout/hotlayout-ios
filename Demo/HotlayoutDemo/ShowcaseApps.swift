@@ -79,18 +79,21 @@ struct ShowcaseScreen: View {
 
     @State private var loaded: Loaded?
 
+    /// The language of the host: the device's, unless a launch argument names one.
+    private var hostLocale: String { locale ?? Locale.current.identifier }
+
     var body: some View {
         Group {
             switch loaded?.document {
             case .success(let document)?:
                 if let loaded {
                     HotlayoutScreen(
-                        document: document, theme: loaded.theme, data: loaded.host.data, locale: locale ?? "en", entry: entry,
+                        document: document, theme: loaded.theme, data: loaded.host.data, locale: hostLocale, entry: entry,
                         timeZone: TimeZone(identifier: "UTC"), now: loaded.host.now, images: ShowcaseApp.images,
                         onAction: { action, _ in NSLog("action %@", action.type) },
                         onReport: { reports in reports.forEach { NSLog("report %@", String(describing: $0)) } }
                     )
-                    .id(app.rawValue + (locale ?? ""))
+                    .id(app.rawValue + hostLocale)
                 }
             case .failure(let error)?:
                 Text("Could not open \(app.title): \(String(describing: error))").padding()
@@ -98,12 +101,12 @@ struct ShowcaseScreen: View {
                 Color.clear
             }
         }
-        .task(id: app.rawValue + (locale ?? "")) {
+        .task(id: app.rawValue + hostLocale) {
             let defaults = UserDefaults.standard
             loaded = Loaded(
                 document: Result { try app.document(screenId: defaults.string(forKey: "screen")) },
                 theme: app.theme(),
-                host: app.hostData(locale: locale ?? "en", scenario: defaults.string(forKey: "scenario"), tab: defaults.string(forKey: "tab"))
+                host: app.hostData(locale: hostLocale, scenario: defaults.string(forKey: "scenario"), tab: defaults.string(forKey: "tab"))
             )
         }
     }

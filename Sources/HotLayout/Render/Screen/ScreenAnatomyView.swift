@@ -19,6 +19,22 @@ private struct ZoneHeightKey: PreferenceKey {
 
 private final class ScrollMemory {
     var top = 0.0
+    let reveal = RevealRequest()
+}
+
+/// The request to bring the focused field into view is made twice, the second time once the keyboard
+/// and the typing have settled. A person who starts to scroll the body in between keeps their position.
+final class RevealRequest {
+    private(set) var dragged = false
+
+    /// A new request: the focus or the keyboard changed.
+    func begin() { dragged = false }
+
+    /// A drag began in the body.
+    func userDragged() { dragged = true }
+
+    /// Whether the repeat of the request may still move the body.
+    var repeatMayScroll: Bool { !dragged }
 }
 
 /// A screen as the contract gives it anatomy (`x-style.layout.screen`): the app bar and the
@@ -47,6 +63,7 @@ struct ScreenRootView: View {
     @State private var memory = ScrollMemory()
     /// The modal layer around the screen, if any: its sheet drag asks how far the body is scrolled.
     @Environment(\.modalScrollSink) private var modalScrollSink
+    @Environment(\.layerAboveKeyboard) private var layerAboveKeyboard
 
     private static let scrollSpace = "hotlayout-screen-body"
 
@@ -54,7 +71,8 @@ struct ScreenRootView: View {
         let style = rootStyle()
         let look = context.resolver.box(style, scope: context.scope)
         let inner = withForm(context.with(inherited: NodeStyle.inherited(context.inherited, style: style, resolver: context.resolver)))
-        let plan = Plan(root: root, context: context, look: look, insets: insets, shrinks: shrinks)
+        // A layer lifted above the keyboard no longer lies over the bottom inset of the platform.
+        let plan = Plan(root: root, context: context, look: look, insets: layerAboveKeyboard ? ScreenInsets(top: insets.top, bottom: 0) : insets, shrinks: shrinks)
 
         ZStack {
             BackgroundView(
@@ -168,14 +186,16 @@ struct ScreenRootView: View {
     /// body area by the smallest amount; a field that is in view does not move.
     private func reveal(_ reader: ScrollViewProxy) {
         guard let id = focusedField else { return }
+        memory.reveal.begin()
         func scroll() {
             guard focusedField == id else { return }
             withAnimation(.easeOut(duration: 0.2)) { reader.scrollTo(id) }
         }
         DispatchQueue.main.async(execute: scroll)
         // The keyboard and the typing that follows the tap may cut the first scroll short; once they
-        // settle, the same request finds the block in view with its tail and moves nothing.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: scroll)
+        // settle, the same request finds the block in view with its tail and moves nothing. A person who
+        // has started to scroll in the meantime keeps the position they chose.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { if memory.reveal.repeatMayScroll { scroll() } }
     }
 
     private func scrollView(_ plan: Plan, look: BoxLook, inner: RenderContext, minBlock: CGFloat?) -> some View {
@@ -198,6 +218,7 @@ struct ScreenRootView: View {
         }
         .coordinateSpace(name: Self.scrollSpace)
         .scrollDismissesKeyboard(.interactively)
+        .simultaneousGesture(DragGesture(minimumDistance: 6).onChanged { _ in memory.reveal.userDragged() })
         .onPreferenceChange(ScrollTopKey.self) { bodyScrolled(to: $0, plan) }
     }
 
