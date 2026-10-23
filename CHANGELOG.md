@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 Drawing:
 
@@ -8,11 +8,6 @@ Drawing:
   floating) stayed directly above it, because the system shrank the screen for the keyboard before the
   reader's own rules ran. The screen now keeps its size, so the bar stays under the keyboard and only the
   pinned block rides above it, as the contract says.
-
-## 0.2.2
-
-Drawing:
-
 - **Focused field above the keyboard.** The field with the keyboard, together with the helper or
   counter under it, is scrolled into the body area once the keyboard has shrunk the area (before,
   the scroll ran on focus, ahead of the keyboard, and the field could stay under it). A field that
