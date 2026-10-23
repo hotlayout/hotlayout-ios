@@ -160,7 +160,6 @@ final class KeyboardFocusTests: XCTestCase {
         // The bar of navigation stays under the keyboard (the keyboard covers it); only a pinned block rides above.
         // (The frame of the keyboard starts under its suggestions row, which belongs to the keyboard too.)
         XCTAssertGreaterThanOrEqual(home.frame.minY, keys.frame.minY - Self.suggestionsRow, "the bar of navigation is not lifted above the keyboard")
-        print("NAVDBG home=\(home.frame) comment=\(comment.frame) keys=\(keys.frame)")
         XCTAssertEqual(home.frame.minY - comment.frame.maxY, Self.tail + Self.fieldBoxInset, accuracy: 1.5, "the tail of the body stays between the field and the bar of navigation")
     }
 

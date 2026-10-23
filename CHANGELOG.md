@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+Drawing:
+
+- **Navigation bar under the keyboard.** With the on-screen keyboard up, the navigation bar (fixed or
+  floating) stayed directly above it, because the system shrank the screen for the keyboard before the
+  reader's own rules ran. The screen now keeps its size, so the bar stays under the keyboard and only the
+  pinned block rides above it, as the contract says.
+
 ## 0.2.2
 
 Drawing:
