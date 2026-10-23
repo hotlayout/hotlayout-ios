@@ -215,13 +215,17 @@ final class BehaviourTests: XCTestCase {
         let app = launchFixture("full-catalog-screen")
         let accordion = app.buttons["Як обирають переможців?"]
         XCTAssertTrue(accordion.waitForExistence(timeout: 5))
-        let below = app.buttons["Забрати нагороду"].frame.minY
+        let reward = app.buttons["Забрати нагороду"]
+        XCTAssertTrue(reward.waitForExistence(timeout: 5))
+        // The layout has settled when the position of the button below stops changing.
+        var below = reward.frame.minY
+        XCTAssertTrue(waitUntil { let now = reward.frame.minY; defer { below = now }; return now == below }, "the screen settles")
         accordion.tap()
-        sleep(1)
-        XCTAssertGreaterThan(app.buttons["Забрати нагороду"].frame.minY, below + 10, "the accordion opens and pushes the content down")
+        XCTAssertTrue(waitUntil { reward.frame.minY > below + 10 }, "the accordion opens and pushes the content down")
         attachScreenshot(app, "accordion open")
+        let opened = reward.frame.minY
         app.swipeUp()
-        sleep(1)
+        XCTAssertTrue(waitUntil { reward.frame.minY < opened - 10 || !reward.isHittable }, "the body scrolls")
         attachScreenshot(app, "tabs")
     }
 

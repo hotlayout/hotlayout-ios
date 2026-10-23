@@ -1,0 +1,854 @@
+{
+  "schemaVersion": "9.28.0",
+  "documentId": "keyboard-screens",
+  "name": "Keyboard reveal",
+  "initialScreenId": "host",
+  "screens": [
+    {
+      "screenId": "host",
+      "name": "Host",
+      "root": {
+        "id": "host-root",
+        "type": "Screen",
+        "props": {
+          "gap": "md"
+        },
+        "style": {
+          "padding": "lg",
+          "background": {
+            "kind": "color",
+            "color": "surface"
+          }
+        },
+        "children": [
+          {
+            "id": "host-bar",
+            "type": "AppBar",
+            "props": {
+              "title": {
+                "kind": "literal",
+                "value": "Keyboard"
+              },
+              "showBack": false
+            },
+            "style": {
+              "padding": {
+                "top": "sm",
+                "bottom": "sm"
+              }
+            }
+          },
+          {
+            "id": "host-lead",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Open the sheet with a form"
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            },
+            "style": {
+              "typography": "titleM"
+            }
+          },
+          {
+            "id": "host-open",
+            "type": "Button",
+            "props": {
+              "label": {
+                "kind": "literal",
+                "value": "Open the form"
+              },
+              "variant": "primary",
+              "action": {
+                "type": "navigate",
+                "params": {
+                  "screenId": "sheet"
+                }
+              },
+              "fullWidth": true
+            }
+          },
+          {
+            "id": "host-open-short",
+            "type": "Button",
+            "props": {
+              "label": {
+                "kind": "literal",
+                "value": "Open the short form"
+              },
+              "variant": "primary",
+              "action": {
+                "type": "navigate",
+                "params": {
+                  "screenId": "short"
+                }
+              },
+              "fullWidth": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "screenId": "sheet",
+      "name": "Sheet form",
+      "presentation": "modal",
+      "root": {
+        "id": "sheet-root",
+        "type": "Screen",
+        "props": {
+          "gap": "md"
+        },
+        "style": {
+          "padding": "lg",
+          "background": {
+            "kind": "color",
+            "color": "surface"
+          },
+          "radius": {
+            "topStart": "lg",
+            "topEnd": "lg"
+          }
+        },
+        "children": [
+          {
+            "id": "sheet-title",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Your note"
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            },
+            "style": {
+              "typography": "titleM"
+            }
+          },
+          {
+            "id": "sheet-line-0",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 0: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-line-1",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 1: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-line-2",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 2: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-line-3",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 3: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-line-4",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 4: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-line-5",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 5: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-line-6",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 6: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-line-7",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 7: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "sheet-note",
+            "type": "TextField",
+            "props": {
+              "label": {
+                "kind": "literal",
+                "value": "Sheet note"
+              },
+              "value": {
+                "kind": "binding",
+                "path": "form.sheetNote"
+              },
+              "placeholder": {
+                "kind": "literal",
+                "value": "Type here"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "screenId": "nav",
+      "name": "Nav form",
+      "root": {
+        "id": "nav-root",
+        "type": "Screen",
+        "props": {
+          "gap": "md"
+        },
+        "style": {
+          "padding": "lg",
+          "background": {
+            "kind": "color",
+            "color": "surface"
+          }
+        },
+        "children": [
+          {
+            "id": "nav-bar",
+            "type": "AppBar",
+            "props": {
+              "title": {
+                "kind": "literal",
+                "value": "Nav form"
+              },
+              "showBack": false
+            },
+            "style": {
+              "padding": {
+                "top": "sm",
+                "bottom": "sm"
+              }
+            }
+          },
+          {
+            "id": "nav-line-0",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 0: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-1",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 1: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-2",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 2: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-3",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 3: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-4",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 4: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-5",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 5: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-6",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 6: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-7",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 7: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-8",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 8: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-9",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 9: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-10",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 10: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-11",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 11: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-12",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 12: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-line-13",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 13: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "nav-comment",
+            "type": "TextField",
+            "props": {
+              "label": {
+                "kind": "literal",
+                "value": "Comment"
+              },
+              "value": {
+                "kind": "binding",
+                "path": "form.comment"
+              },
+              "placeholder": {
+                "kind": "literal",
+                "value": "Type here"
+              }
+            }
+          },
+          {
+            "id": "nav-bottom",
+            "type": "NavBar",
+            "props": {},
+            "children": [
+              {
+                "id": "nav-bottom-home",
+                "type": "NavItem",
+                "props": {
+                  "icon": "house",
+                  "label": {
+                    "kind": "literal",
+                    "value": "Home"
+                  },
+                  "action": {
+                    "type": "navigate.section",
+                    "params": {
+                      "screenId": "nav"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "nav-bottom-more",
+                "type": "NavItem",
+                "props": {
+                  "icon": "target",
+                  "label": {
+                    "kind": "literal",
+                    "value": "More"
+                  },
+                  "action": {
+                    "type": "navigate.section",
+                    "params": {
+                      "screenId": "navfloat"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "screenId": "navfloat",
+      "name": "Floating nav form",
+      "root": {
+        "id": "navfloat-root",
+        "type": "Screen",
+        "props": {
+          "gap": "md"
+        },
+        "style": {
+          "padding": "lg",
+          "background": {
+            "kind": "color",
+            "color": "surface"
+          }
+        },
+        "children": [
+          {
+            "id": "navfloat-bar",
+            "type": "AppBar",
+            "props": {
+              "title": {
+                "kind": "literal",
+                "value": "Floating nav form"
+              },
+              "showBack": false
+            },
+            "style": {
+              "padding": {
+                "top": "sm",
+                "bottom": "sm"
+              }
+            }
+          },
+          {
+            "id": "navfloat-line-0",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 0: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-1",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 1: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-2",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 2: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-3",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 3: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-4",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 4: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-5",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 5: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-6",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 6: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-7",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 7: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-8",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 8: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-9",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 9: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-10",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 10: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-11",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 11: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-12",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 12: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-line-13",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Paragraph 13: some text that fills the screen so the form below sits low."
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            }
+          },
+          {
+            "id": "navfloat-comment",
+            "type": "TextField",
+            "props": {
+              "label": {
+                "kind": "literal",
+                "value": "Comment"
+              },
+              "value": {
+                "kind": "binding",
+                "path": "form.floatComment"
+              },
+              "placeholder": {
+                "kind": "literal",
+                "value": "Type here"
+              }
+            }
+          },
+          {
+            "id": "navfloat-bottom",
+            "type": "NavBar",
+            "props": {
+              "float": true
+            },
+            "children": [
+              {
+                "id": "navfloat-bottom-home",
+                "type": "NavItem",
+                "props": {
+                  "icon": "house",
+                  "label": {
+                    "kind": "literal",
+                    "value": "Home"
+                  },
+                  "action": {
+                    "type": "navigate.section",
+                    "params": {
+                      "screenId": "nav"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "navfloat-bottom-more",
+                "type": "NavItem",
+                "props": {
+                  "icon": "target",
+                  "label": {
+                    "kind": "literal",
+                    "value": "More"
+                  },
+                  "action": {
+                    "type": "navigate.section",
+                    "params": {
+                      "screenId": "navfloat"
+                    }
+                  }
+                }
+              }
+            ],
+            "style": {
+              "margin": {
+                "start": "lg",
+                "end": "lg",
+                "bottom": "sm"
+              },
+              "radius": "lg",
+              "background": {
+                "kind": "color",
+                "color": {
+                  "token": "surface",
+                  "opacity": 0.72
+                }
+              },
+              "shadow": "medium"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "screenId": "short",
+      "name": "Short sheet",
+      "presentation": "modal",
+      "root": {
+        "id": "short-root",
+        "type": "Screen",
+        "props": {
+          "gap": "md"
+        },
+        "style": {
+          "padding": "lg",
+          "background": {
+            "kind": "color",
+            "color": "surface"
+          },
+          "radius": {
+            "topStart": "lg",
+            "topEnd": "lg"
+          }
+        },
+        "children": [
+          {
+            "id": "short-title",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "Your note"
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            },
+            "style": {
+              "typography": "titleM"
+            }
+          },
+          {
+            "id": "short-note",
+            "type": "TextField",
+            "props": {
+              "label": {
+                "kind": "literal",
+                "value": "Short note"
+              },
+              "value": {
+                "kind": "binding",
+                "path": "form.shortNote"
+              },
+              "placeholder": {
+                "kind": "literal",
+                "value": "Type here"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

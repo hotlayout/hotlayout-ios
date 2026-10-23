@@ -89,6 +89,8 @@ struct ModalLayerView<Content: View>: View {
     @State private var origin: (scrolled: Double, started: Bool)?
     @State private var samples: [(time: Double, y: Double)] = []
     @State private var sink = ModalScrollSink()
+    /// How far the on-screen keyboard reaches into the layer's area: the sheet or window rides above it.
+    @State private var keyboard = 0.0
 
     /// A window in the middle, whether the author asked for it or a sheet became one in a wide place.
     private var window: Bool { shape != .sheet }
@@ -115,12 +117,15 @@ struct ModalLayerView<Content: View>: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.top, CGFloat(insets.top))
-            .padding(.bottom, window ? CGFloat(insets.bottom) : 0)
+            .padding(.bottom, keyboard > 0 ? CGFloat(keyboard) : window ? CGFloat(insets.bottom) : 0)
+            .environment(\.layerAboveKeyboard, keyboard > 0)
             .blur(radius: blurredBy)
             .offset(y: offset)
             .modifier(SheetDrag(enabled: !window && dismissible && isTop && !exiting, gesture: dragGesture))
             .transition(layerTransition)
         }
+        // Measured on the area of the layer, which the lift does not move.
+        .keyboardOverlap($keyboard)
         .allowsHitTesting(isTop && !exiting)
         .accessibilityHidden(!isTop)
         .accessibilityAddTraits(isTop ? .isModal : [])
@@ -246,5 +251,15 @@ struct ModalStack<Page: View, Layer: View>: View {
                 .zIndex(Double(index + 1))
             }
         }
+    }
+}
+
+private struct LayerAboveKeyboardKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    /// The layer around the screen has been lifted above the keyboard: the screen needs no bottom inset of the platform.
+    var layerAboveKeyboard: Bool {
+        get { self[LayerAboveKeyboardKey.self] }
+        set { self[LayerAboveKeyboardKey.self] = newValue }
     }
 }
