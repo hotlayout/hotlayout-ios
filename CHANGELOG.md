@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+Placements:
+
+- **Named places of the app.** `HotlayoutPlacement.load(name:projectBase:)` reads the placement map
+  of the project (`placements/published.json`, with its `ETag`), finds the document placed under
+  the name and returns it with its entry point, the status of the map and a report of why nothing
+  is drawn (`empty`, `unknown`, `unreadable`, `documentMissing`, `documentUnreadable`,
+  `entryMissing`). `HotlayoutPlacementView` draws it with a `HotlayoutScreen`, and nothing for a
+  place that has no document. The map is read tolerantly (an unknown field is skipped, a broken
+  record spoils only its own place, a key is looked up among the map's own keys, a `documentId` must
+  have the form of a path segment before it is put into an address). The last known map and
+  documents are kept (`UserDefaults` by default) and a copy bundled with the app is the last
+  fallback; "the network is silent", "the map is broken" and "the project published no map" are
+  different statuses. Every row of the shared placement table runs in the tests.
+
 Drawing:
 
 - **Focused field above the keyboard.** The field with the keyboard, together with the helper or

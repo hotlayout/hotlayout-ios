@@ -132,6 +132,56 @@ The public API, besides the view:
 | `ImagePolicy`, `WritablePaths`, `ScreenLabels` | decisions of the host: pictures, writable data paths, texts of the reader |
 | `HotlayoutReport` | what the reader skipped or replaced; never shown to the person |
 
+## Placements
+
+A *placement* is a named place of your app (`home.banner`). The app names the place in code;
+which published document stands there is decided in the admin, and changed without a release.
+
+```swift
+struct HomeBanner: View {
+    let projectBase = URL(string: "https://storage.example.com/orgs/acme/projects/app")!
+
+    var body: some View {
+        // Draws what the admin put in the place `home.banner`, and nothing when it is empty.
+        HotlayoutPlacementView(
+            name: "home.banner",
+            projectBase: projectBase,
+            onPlacement: { placement in
+                if let report = placement.report { print("home.banner:", report, placement.mapStatus) }
+            }
+        )
+    }
+}
+
+/// Without a view: load the place, then draw the document yourself.
+func loadBanner(projectBase: URL) async -> HotlayoutDocument? {
+    let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: projectBase)
+    return placement.document  // `placement.entry` is the entry point to pass to `HotlayoutScreen`
+}
+```
+
+The reader asks `placements/published.json` under `projectBase` with its `ETag`, and the document
+of the place under `documents/{documentId}/published.json`. It keeps the last map and document it
+read, and falls back, in this order, on the last known map and then on `bundledMap` (the text of a
+copy shipped with the app, for a first start without a network). Nothing throws; a place that
+draws nothing says why in `placement.report`:
+
+| `report` | |
+|---|---|
+| `empty` | the place is declared and empty on purpose |
+| `unknown` | the map has no such place (or the project published no map) |
+| `unreadable` | the map, or this place's record, could not be read |
+| `documentMissing` / `documentUnreadable` | the document is gone (404) / could not be read |
+| `entryMissing` | the entry point is not in the document: it is drawn from its first screen |
+
+`placement.mapStatus` says why that map is in use: `fresh`, `offline` (the network was silent),
+`corrupt` (it answered with something that is not a map), `unsupported` (a map of another major
+version) or `notPublished` (404). A name is lowercase Latin letters and digits in dot-separated
+segments; a name of another form is `unknown` and no request is made for it. Use
+`HotlayoutPlacementView(name:projectBase:…content:)` to draw with a `HotlayoutScreen` of your own
+configuration, and `store:` / `session:` to choose where the last known copies live and how the
+requests are made. The view loads once per name; it does not poll.
+
 ## What the reader does and does not do
 
 - **Documents, themes and data are untrusted input.** A piece of the wrong shape is skipped and
