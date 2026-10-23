@@ -8,7 +8,7 @@ final class ReadmeExampleTests: XCTestCase {
         let here = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         let source = try String(contentsOf: here.appendingPathComponent("ReadmeExample.swift"), encoding: .utf8)
         let readme = try String(contentsOf: here.appendingPathComponent("../../README.md").standardized, encoding: .utf8)
-        for name in ["readme", "readme-async"] {
+        for name in ["readme", "readme-async", "readme-placement"] {
             let parts = source.components(separatedBy: "// #region \(name)\n")
             XCTAssertEqual(parts.count, 2, name)
             let region = try XCTUnwrap(parts.last?.components(separatedBy: "// #endregion \(name)").first)

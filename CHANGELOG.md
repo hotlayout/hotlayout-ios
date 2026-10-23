@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+Placements:
+
+- **Named places of the app.** `HotlayoutPlacement.load(name:projectBase:)` reads the placement map
+  of the project (`placements/published.json`, with its `ETag`), finds the document placed under
+  the name and returns it with its entry point, the status of the map and a report of why nothing
+  is drawn (`empty`, `unknown`, `unreadable`, `documentMissing`, `documentUnreadable`,
+  `entryMissing`). `HotlayoutPlacementView` draws it with a `HotlayoutScreen`, and nothing for a
+  place that has no document. The map is read tolerantly (an unknown field is skipped, a broken
+  record spoils only its own place, a key is looked up among the map's own keys, a `documentId` must
+  have the form of a path segment before it is put into an address). The last known map and
+  documents are kept (`UserDefaults` by default) and a copy bundled with the app is the last
+  fallback; "the network is silent", "the map is broken" and "the project published no map" are
+  different statuses. Every row of the shared placement table runs in the tests.
+
+Reading rules, the same in every reader:
+
+- The map body is read up to 262 144 bytes as strict UTF-8, with one leading byte order mark skipped;
+  anything else, or nesting deeper than 32 levels, is `corrupt` for the whole map. The major version
+  is compared as a string of digits, so a very long major is `unsupported` and never wraps around.
+- Redirects are not followed (even within the same host): a 3xx answer is "the network is silent"
+  for the map (`offline`) and `documentUnreadable` for a document. A request has a 20-second limit
+  from its start to the end of its body.
+- `onPlacement` is called with the first settled state of a place and then on every change of
+  `placement.event` (`status`, `report`, `mapStatus`, `documentId`, `entry`), including the return
+  to a shown document. A new `name` or `projectBase` drops the old place at once, and a load that
+  was replaced or cancelled never writes the view.
+- The last known map is kept under the address of the map. Documents are kept in files in the
+  caches directory (`HotlayoutFilePlacementDocumentStore`; `documents:` on `load` and the view
+  chooses another), under the address of the document: one for each place of the current map,
+  the others removed once a fresh map is read, and a 404 removes its document.
+
 ## 0.2.2
 
 Drawing:

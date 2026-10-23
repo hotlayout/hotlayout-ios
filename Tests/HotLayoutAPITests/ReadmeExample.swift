@@ -67,3 +67,26 @@ struct CheckoutScreen: View {
     }
 }
 // #endregion readme-async
+
+// #region readme-placement
+struct HomeBanner: View {
+    let projectBase = URL(string: "https://storage.example.com/orgs/acme/projects/app")!
+
+    var body: some View {
+        // Draws what the admin put in the place `home.banner`, and nothing when it is empty.
+        HotlayoutPlacementView(
+            name: "home.banner",
+            projectBase: projectBase,
+            onPlacement: { placement in
+                if let report = placement.report { print("home.banner:", report, placement.mapStatus) }
+            }
+        )
+    }
+}
+
+/// Without a view: load the place, then draw the document yourself.
+func loadBanner(projectBase: URL) async -> HotlayoutDocument? {
+    let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: projectBase)
+    return placement.document  // `placement.entry` is the entry point to pass to `HotlayoutScreen`
+}
+// #endregion readme-placement
