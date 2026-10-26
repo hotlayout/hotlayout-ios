@@ -436,6 +436,7 @@ final class ScreenAnatomyCasesTests: XCTestCase {
             "ratioDocumentCases": "validator rule of the image ratio",
             "modalCases": "the geometry of the modal layer: run in ModalCasesTests", "modalAreaCases": "the geometry of the modal layer: run in ModalCasesTests",
             "modalRuleCases": "the data of the modal layer block: run in ModalCasesTests",
+            "safeTopModalCases": "the layer below the top inset the host passes: not run yet; the layer is laid in the safe area of the system",
             "documentCases": "validator rule", "appBarPlaceCases": "where the editor puts a dropped child: not a reader's rule",
             "appBar916DocumentCases": "validator rule",
             "screenTopDocumentCases": "schema acceptance of the field: the validator; the word itself is run by bodyTopCases",

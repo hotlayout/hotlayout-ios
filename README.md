@@ -3,7 +3,7 @@
 A Swift package that draws server-driven UI (SDUI) screens published by the
 [HotLayout](https://hotlayout.com) builder: a JSON document, a theme and your data become a native SwiftUI screen.
 
-It reads the same contract as the React and Flutter readers (document schema **9.28.0**, theme
+It reads the same contract as the React and Flutter readers (document schema **9.30.0**, theme
 **4.0.1**, icon set **1.0.0**) and is measured by the same shared case tables. All 28 widgets of
 the contract are drawn.
 

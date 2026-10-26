@@ -62,6 +62,11 @@ struct ScreenSim {
         else { return }
         guard !WritePress.isDisabled(actor, scope: scope, screenRoot: root, screenScope: scope) else { return }
         guard let action = WriteActions.pressAction(of: actor) else { return }
+        run(action)
+    }
+
+    /// The effects of one action, in the order the host sees them.
+    mutating func run(_ action: JSONObject) {
         guard let effects = WritePress.effects(of: action, read: { scope[$0] }) else {
             // Any other action: the analytics event goes first, then the action itself.
             if let track = ActionCatalog.track(action) { log.append(["track", .string(track.event)]) }

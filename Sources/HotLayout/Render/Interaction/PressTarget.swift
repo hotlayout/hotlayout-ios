@@ -39,10 +39,9 @@ enum PressTarget {
 
     /// The long press of a container or a list row that does something, or `nil`.
     static func longPress(_ node: DocumentNode) -> JSONObject? {
-        // Write actions are not published on a long press, and the reader does not run one there.
-        guard acceptsLongPress(node.type), let action = node.props["longPress"]?.objectValue, acts(action),
-            !WriteActions.isWriteType(action["type"]?.stringValue)
-        else { return nil }
+        // A write action runs here like any other: through the same write as the action of a
+        // node. Only `action` gives a node its role, so a write on a long press makes no option.
+        guard acceptsLongPress(node.type), let action = node.props["longPress"]?.objectValue, acts(action) else { return nil }
         return action
     }
 

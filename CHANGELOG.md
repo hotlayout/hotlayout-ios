@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased (0.4.0)
+
+Reads document contract **9.30.0** (theme 4.0.1, icon set 1.0.0).
+
+- **Write on a long press.** A long press may carry `setValue` or `toggleValue`, as long as the
+  press of the node does not write. It runs like the action of a node that writes: the same
+  session and `onWrite` under `writablePaths`, the same "a value already held is not written
+  again", and the haptic request and the analytics event go before the write. The keyboard
+  (Shift+F10) and the named action of a screen reader do the same. Only `action` gives a node its
+  role, so such a node stays a plain button, not an option or a switch. Before, a write action on
+  a long press was ignored.
+- **Node `name`.** The optional name a node carries for the editor's tree is not drawn, not part
+  of any accessible name, and not passed to actions, events or reports; a document with it draws
+  exactly as without it.
+
 ## 0.3.0 - 2026-10-26
 
 Placements:
