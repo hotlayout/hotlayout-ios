@@ -1,7 +1,7 @@
 # HotLayout for iOS
 
-A Swift package that draws screens published by the [HotLayout](https://hotlayout.com)
-builder: a JSON document, a theme and your data become a native SwiftUI screen.
+A Swift package that draws server-driven UI (SDUI) screens published by the
+[HotLayout](https://hotlayout.com) builder: a JSON document, a theme and your data become a native SwiftUI screen.
 
 It reads the same contract as the React and Flutter readers (document schema **9.28.0**, theme
 **4.0.1**, icon set **1.0.0**) and is measured by the same shared case tables. All 28 widgets of
@@ -22,7 +22,7 @@ HotLayout is installed with Swift Package Manager.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/hotlayout/hotlayout-ios", from: "0.2.2"),
+    .package(url: "https://github.com/hotlayout/hotlayout-ios", from: "0.3.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -35,7 +35,7 @@ targets: [
 
 1. Choose File > Add Package Dependencies...
 2. Paste `https://github.com/hotlayout/hotlayout-ios` into the search field.
-3. Set the dependency rule to Up to Next Major Version, from `0.2.2`, and choose Add Package.
+3. Set the dependency rule to Up to Next Major Version, from `0.3.0`, and choose Add Package.
 4. Add the `HotLayout` library to your app target, then `import HotLayout`.
 
 ## Use

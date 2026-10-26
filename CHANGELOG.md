@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-10-26
 
 Placements:
 
@@ -33,7 +33,7 @@ Reading rules, the same in every reader:
   chooses another), under the address of the document: one for each place of the current map,
   the others removed once a fresh map is read, and a 404 removes its document.
 
-## 0.2.2
+Fixes:
 
 Drawing:
 
