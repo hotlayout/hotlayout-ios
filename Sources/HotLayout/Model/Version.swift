@@ -6,7 +6,7 @@ import Foundation
 /// fix a bug without touching the contract, and a contract minor may need no code here.
 public enum HotlayoutVersions {
     /// Widget schema (`x-schemaVersion` of `screen-schema.json`).
-    public static let schema = "9.30.0"
+    public static let schema = "9.31.0"
     /// Theme contract (`x-themeContractVersion` of `theme.json`).
     public static let theme = "4.0.1"
     /// Icon set (`iconSetVersion` of `icons.json`).

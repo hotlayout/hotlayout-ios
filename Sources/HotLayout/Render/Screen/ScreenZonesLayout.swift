@@ -41,6 +41,8 @@ struct ScreenZonePlan {
     var width: Double
     /// The height of the bar of navigation of its own; zero without one.
     var topNavHeight = 0.0
+    /// The inset of the platform under the root of a sheet that has no bottom zone: room inside its box.
+    var rootInset = 0.0
 }
 
 /// The layout of a screen: the app bar, the top zone, the body, the pinned block and the
@@ -68,9 +70,11 @@ struct ScreenZonesLayout: Layout {
         // The bar holds the inset inside its box; a floating bar does not: the inset lies under it.
         let navContent = navHeight.map { floats ? $0 : max(0, $0 - s.safeBottom) }
 
+        // A sheet without a bottom zone holds the inset under its content (`sheetSafeBottom`); with a zone it lies under the zone.
+        let rootInset = s.shrink && pinnedHeight == nil && navContent == nil ? SheetSafeBottom.inset(s.safeBottom) : 0
         // The bar of its own takes the top of the screen; everything else is counted in what is left under it.
         var input = AnatomyInput(
-            height: (height ?? .infinity) - topNavHeight, shrink: s.shrink || height == nil, appBarHeight: nil, paddingTop: s.paddingTop,
+            height: (height ?? .infinity) - topNavHeight - rootInset, shrink: s.shrink || height == nil, appBarHeight: nil, paddingTop: s.paddingTop,
             paddingBottom: s.paddingBottom,
             gap: s.gap, bodyContentHeight: s.bodyEmpty ? nil : 0, firstPull: s.firstPull,
             bottom: (pinnedHeight != nil || navContent != nil)
@@ -100,14 +104,14 @@ struct ScreenZonesLayout: Layout {
         if !hasTop, hasBar { barTop = zones.appBar?.top }
         zones.lower(by: topNavHeight)
         return ScreenZonePlan(
-            zones: zones, barTop: barTop, barHeight: barHeight, topZoneTop: topZoneTop, topZoneHeight: topHeight, width: width, topNavHeight: topNavHeight)
+            zones: zones, barTop: barTop, barHeight: barHeight, topZoneTop: topZoneTop, topZoneHeight: topHeight, width: width, topNavHeight: topNavHeight, rootInset: rootInset)
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width.flatMap { $0.isFinite ? Double($0) : nil } ?? 393
         let height = proposal.height.flatMap { $0.isFinite ? Double($0) : nil }
         let plan = plan(width: width, height: height, subviews: subviews)
-        return CGSize(width: CGFloat(width), height: CGFloat(plan.zones.height))
+        return CGSize(width: CGFloat(width), height: CGFloat(plan.zones.height + plan.rootInset))
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {

@@ -1,9 +1,18 @@
 # Changelog
 
-## Unreleased (0.4.0)
+## 0.5.0 - Unreleased
 
-Reads document contract **9.30.0** (theme 4.0.1, icon set 1.0.0).
+Reads document contract **9.31.0** (theme 4.0.1, icon set 1.0.0).
 
+- **Bottom safe inset of a modal sheet.** A sheet reaches the physical bottom of the area, and the
+  home indicator no longer covers its last node: the reader adds the bottom safe inset of the
+  window inside the box of the sheet, under its content. The background and the radius of the
+  sheet extend under the inset; the sheet is as tall as its content plus the inset, no taller than
+  the area, and a taller body scrolls above the inset. The inset is added once: with a shown
+  pinned block it lies under the content of that zone, otherwise under the content of the root.
+  A window in the centre and a sheet shown as a window in a wide place get none, and a host that
+  accounted for the inset itself and gives zero gets zero. A value that is not a number, not
+  finite or negative counts as zero. Every row of the shared table runs in the tests.
 - **Write on a long press.** A long press may carry `setValue` or `toggleValue`, as long as the
   press of the node does not write. It runs like the action of a node that writes: the same
   session and `onWrite` under `writablePaths`, the same "a value already held is not written
