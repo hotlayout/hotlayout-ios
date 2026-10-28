@@ -25,8 +25,13 @@ final class CarouselCasesTests: XCTestCase {
 
     func testEveryGroupIsRun() {
         let run: Set<String> = ["hostCases", "readCases", "cardCases", "stopCases", "activeCases", "dotCases", "areaCases", "stateCases"]
+        // The `stop…` groups from `stopPathCases` on belong to the carousel that tells its stop
+        // (`CarouselStopCasesTests`); `stopDocumentCases` is the validator's table.
+        let stopGroups: Set<String> = [
+            "stopPathCases", "stopShownCases", "stopFollowCases", "stopWriteCases", "stopDocumentCases", "stopRunCases", "stopRuleCases",
+        ]
         let groups = Set((Self.table.objectValue ?? JSONObject()).filter { $0.key.hasSuffix("Cases") && $0.value.arrayValue != nil }.map(\.key))
-        XCTAssertEqual(groups, run, "a group of the table this test does not run, or a name that is no group")
+        XCTAssertEqual(groups.subtracting(stopGroups), run, "a group of the table this test does not run, or a name that is no group")
     }
 
     func testDefaultsAreTheTables() {

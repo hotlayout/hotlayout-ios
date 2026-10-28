@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0 - Unreleased
+
+Reads document contract **9.32.0** (theme 4.0.1, icon set 1.0.0).
+
+- **A carousel tells its active stop.** A carousel (a scrolling `Row` or a `Repeater` in a row) may
+  name a number data path in `carousel.stopPath`. When a person swipes it and the scroll settles on
+  a stop, the reader writes the number of that stop, counted from 0 (stops, not cards), the way an
+  input field writes: into the session of the screen and to the host at the same moment, under
+  `writablePaths`; `onAction` is not called. Nothing is written during the gesture, for a move the
+  reader made itself (the show, following the value), or for the number the path already holds.
+  When the carousel is shown it stands on the stop the value names, without animation (a number
+  past the last stop is the last one, anything that is not a whole number is the first); when the
+  number the value names changes, it scrolls there (not while a finger holds the row, without
+  animation under Reduce Motion). A write the host refused leaves the carousel where the person
+  put it. A path of a wrong shape counts as no path. The scroll counts as settled after a quiet
+  time of 150 ms. A gesture the system cancels counts as a finger lifted. Every row of the shared table runs in the tests.
+
 ## 0.5.0 - Unreleased
 
 Reads document contract **9.31.0** (theme 4.0.1, icon set 1.0.0).

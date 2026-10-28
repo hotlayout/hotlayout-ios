@@ -15,6 +15,11 @@ struct CarouselSetup {
     /// Where the active stop is remembered; `nil` keeps nothing.
     var memory: CarouselMemory?
     var memoryKey: String
+    /// The number data path the carousel tells its stop to (`carousel.stopPath`), the value under it
+    /// now and the write of the screen (the session and the host at the same moment).
+    var stopPath: String?
+    var stopValue: JSONValue?
+    var write: ((String, JSONValue) -> Void)?
 }
 
 private struct ViewportKey: PreferenceKey {
@@ -98,7 +103,11 @@ struct CarouselView<Card: View>: View {
     @State private var offset: CGFloat = 0
     @State private var restored = false
     @State private var current = CurrentOffset()
+    @State private var stopController = CarouselStopController()
+    /// True while a finger drags the row; it falls back to false when the gesture is cancelled as well.
+    @GestureState private var dragging = false
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static var space: String { "hotlayout.carousel" }
 
@@ -122,12 +131,14 @@ struct CarouselView<Card: View>: View {
 
     private var activeStop: Int {
         let stops = stops.stops
+        if !restored, setup.stopPath != nil { return CarouselStop.shownStop(setup.stopValue, stopCount: stops.count) }
         if !restored, let remembered = setup.memory?.stop(for: setup.memoryKey) { return min(remembered, stops.count - 1) }
         return CarouselRules.activeStop(stops, offset: Double(offset))
     }
 
     var body: some View {
         let plan = stops
+        let _ = configureStop()
         let dots =
             viewport.map {
                 CarouselRules.dotCount(
@@ -138,6 +149,14 @@ struct CarouselView<Card: View>: View {
             if dots > 0 { dotRow(count: dots, active: activeStop) }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    /// What the controller of the stop reads on every draw (a plain object: no state changes here).
+    private func configureStop() {
+        stopController.path = setup.stopPath
+        stopController.current = setup.stopValue
+        stopController.write = setup.write
+        stopController.reducedMotion = reduceMotion
     }
 
     private func scroller(_ plan: CarouselRules.Stops) -> some View {
@@ -161,6 +180,13 @@ struct CarouselView<Card: View>: View {
                 }
                 .overlay(alignment: .leading) { anchors(plan) }
             }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 1)
+                    .updating($dragging) { _, state, _ in state = true }
+                    .onChanged { _ in stopController.personBegan() }
+                    .onEnded { _ in stopController.personReleased() },
+                including: setup.stopPath == nil ? .subviews : .all
+            )
             .carouselSnap(stops: plan.stops, rightToLeft: setup.rightToLeft, scale: Double(displayScale), current: current)
             .coordinateSpace(name: Self.space)
             .background(GeometryReader { geometry in Color.clear.preference(key: ViewportKey.self, value: geometry.size.width) })
@@ -170,10 +196,20 @@ struct CarouselView<Card: View>: View {
                 guard let value else { return }
                 offset = value
                 current.value = Double(value)
+                stopController.scrolled(to: Double(value))
                 if restored { remember(CarouselRules.activeStop(plan.stops, offset: Double(value))) }
             }
-            .onChange(of: plan) { restore($0, proxy: proxy) }
-            .onAppear { restore(plan, proxy: proxy) }
+            .onChange(of: plan) {
+                if restored { stopController.updateStops($0.stops) }
+                restore($0, proxy: proxy)
+            }
+            .onChange(of: CarouselStop.number(of: setup.stopValue)) { _ in stopController.update(value: setup.stopValue) }
+            .onAppear {
+                stopController.scrollToStop = { stop, animated in scrollToStop(stop, animated: animated, proxy: proxy) }
+                restore(plan, proxy: proxy)
+            }
+            .onChange(of: dragging) { held in if !held { stopController.personReleased() } }
+            .onDisappear { stopController.cancel() }
             .opacity(viewport == nil ? 0 : 1)
         }
     }
@@ -197,6 +233,14 @@ struct CarouselView<Card: View>: View {
     /// Once the stops are known, puts the scroll on the stop the frame remembers (no animation).
     private func restore(_ plan: CarouselRules.Stops, proxy: ScrollViewProxy) {
         guard !restored, viewport != nil, widths.count == count, count > 0 else { return }
+        if setup.stopPath != nil {
+            // The value under the path decides where the carousel stands; the memory of the frame
+            // does not (the content under the carousel reads the same value).
+            if plan.stops.count <= 1 && count > 1 { return }
+            restored = true
+            stopController.observe(stops: plan.stops)
+            return
+        }
         let remembered = setup.memory?.stop(for: setup.memoryKey) ?? 0
         // The stops of a plan made before every card was measured are just [0]: wait for the real ones.
         if remembered >= plan.stops.count && plan.stops.count <= 1 { return }
@@ -208,6 +252,19 @@ struct CarouselView<Card: View>: View {
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) { proxy.scrollTo(stop, anchor: .leading) }
+        }
+    }
+
+    /// A move of the reader to a stop of the plan; a jump is made after the layout pass that measured the cards.
+    private func scrollToStop(_ stop: Int, animated: Bool, proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            if animated {
+                withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(stop, anchor: .leading) }
+            } else {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { proxy.scrollTo(stop, anchor: .leading) }
+            }
         }
     }
 
@@ -229,6 +286,7 @@ extension CarouselSetup {
     {
         let resolver = context.resolver
         func spacing(_ token: String) -> Double? { resolver.spacing(.string(token)) }
+        let stopPath = CarouselStop.path(of: node)
         let key = CarouselMemory.key(
             frame: context.frameIndex, screenId: context.screenId,
             state: CarouselRules.stateKey(nodeId: node.id, instancePath: context.instancePath)
@@ -239,7 +297,8 @@ extension CarouselSetup {
             dotSize: spacing(CarouselRules.dotSizeToken) ?? 8, dotGap: spacing(CarouselRules.dotGapToken) ?? 8,
             indicatorGap: spacing(CarouselRules.indicatorGapToken) ?? 8,
             dotColor: (context.theme.coreColor(CarouselRules.dotColorToken)).color,
-            memory: context.carousels, memoryKey: key
+            memory: context.carousels, memoryKey: key,
+            stopPath: stopPath, stopValue: stopPath.flatMap { context.scope[$0] }, write: context.write
         )
     }
 }
