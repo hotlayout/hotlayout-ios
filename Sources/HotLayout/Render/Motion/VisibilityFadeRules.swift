@@ -170,6 +170,12 @@ final class VisibilityFadeHolder {
 
     func frame(at now: Double) -> VisibilityFade.Frame { VisibilityFade.frame(state, at: now) }
 
+    /// The next moment the phase changes by itself after `now` (a leaving node leaves the layout, a
+    /// waiting one enters it, an entering one comes to rest); `nil` at rest.
+    func nextBoundary(after now: Double) -> Double? {
+        VisibilityFade.endsAt(VisibilityFade.settle(state, at: now))
+    }
+
     /// When the running transition ends altogether (a wait and the fade after it); `nil` at rest.
     var endsAt: Double? {
         var end: Double?

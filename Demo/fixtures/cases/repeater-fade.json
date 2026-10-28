@@ -1,0 +1,144 @@
+{
+  "schemaVersion": "9.33.0",
+  "documentId": "repeater-fade",
+  "name": "A list whose template fades",
+  "initialScreenId": "list",
+  "screens": [
+    {
+      "screenId": "list",
+      "name": "List",
+      "root": {
+        "id": "root",
+        "type": "Screen",
+        "props": {
+          "gap": "md"
+        },
+        "style": {
+          "padding": "lg"
+        },
+        "children": [
+          {
+            "id": "top",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "TOP"
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            },
+            "style": {
+              "typography": "titleM"
+            }
+          },
+          {
+            "id": "plain",
+            "type": "Repeater",
+            "props": {
+              "source": "items",
+              "item": "item",
+              "direction": "column",
+              "gap": "md"
+            },
+            "children": [
+              {
+                "id": "plain-row",
+                "type": "Text",
+                "props": {
+                  "content": {
+                    "kind": "binding",
+                    "path": "item.name",
+                    "fallback": "—"
+                  },
+                  "align": "start",
+                  "overflow": "ellipsis"
+                },
+                "style": {
+                  "background": {
+                    "kind": "color",
+                    "color": "primary"
+                  },
+                  "color": "onPrimary"
+                },
+                "visibleIf": {
+                  "path": "item.selectedId",
+                  "op": "neq",
+                  "value": "backpack"
+                }
+              }
+            ]
+          },
+          {
+            "id": "middle",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "MIDDLE"
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            },
+            "style": {
+              "typography": "titleM"
+            }
+          },
+          {
+            "id": "fading",
+            "type": "Repeater",
+            "props": {
+              "source": "items",
+              "item": "item",
+              "direction": "column",
+              "gap": "md"
+            },
+            "children": [
+              {
+                "id": "fading-row",
+                "type": "Text",
+                "props": {
+                  "content": {
+                    "kind": "binding",
+                    "path": "item.name",
+                    "fallback": "—"
+                  },
+                  "align": "start",
+                  "overflow": "ellipsis"
+                },
+                "style": {
+                  "background": {
+                    "kind": "color",
+                    "color": "primary"
+                  },
+                  "color": "onPrimary"
+                },
+                "visibleIf": {
+                  "path": "item.selectedId",
+                  "op": "neq",
+                  "value": "backpack"
+                },
+                "visibilityTransition": "fade"
+              }
+            ]
+          },
+          {
+            "id": "end",
+            "type": "Text",
+            "props": {
+              "content": {
+                "kind": "literal",
+                "value": "END"
+              },
+              "align": "start",
+              "overflow": "ellipsis"
+            },
+            "style": {
+              "typography": "titleM"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

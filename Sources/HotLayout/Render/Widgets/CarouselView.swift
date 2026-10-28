@@ -203,7 +203,10 @@ struct CarouselView<Card: View>: View {
                 if restored { stopController.updateStops($0.stops) }
                 restore($0, proxy: proxy)
             }
-            .onChange(of: CarouselStop.number(of: setup.stopValue)) { _ in stopController.update(value: setup.stopValue) }
+            // The value comes in as the argument: this form of `onChange` calls the closure of the
+            // previous draw, whose `setup` still holds the value before the change (the row then
+            // followed the stop before, a step behind every write).
+            .onChange(of: setup.stopValue) { value in stopController.update(value: value) }
             .onAppear {
                 stopController.scrollToStop = { stop, animated in scrollToStop(stop, animated: animated, proxy: proxy) }
                 restore(plan, proxy: proxy)

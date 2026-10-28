@@ -10,7 +10,7 @@
 #  - Tests/HotLayoutTests/Resources/contract/*.json and fixtures/ — the artifacts and tables
 #    the tests read (an exact copy);
 #  - Demo/fixtures/*.json and themes/ — the screen fixtures the demo app opens (the demo's own
-#    `hostile/`, `images/` and `sample-data/` stay);
+#    `hostile/`, `cases/`, `images/` and `sample-data/` stay);
 #  - Sources/HotLayout/Resources/icons.json — the icon set the reader ships with;
 #  - Sources/HotLayout/Resources/built-in-theme.json — the `contract` block of theme.json,
 #    the theme the reader uses when the host passes none.

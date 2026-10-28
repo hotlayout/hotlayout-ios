@@ -2,6 +2,18 @@
 
 ## 0.7.2 - Unreleased
 
+- **A carousel with `stopPath` stays on the stop a person swiped to.** From the second swipe on, the
+  row went back to the stop before about half a second after it settled. The change of the value
+  was handed to the carousel from the draw before the change, so each write was followed as a change
+  of the previous value; the carousel now takes the new value the change carries.
+- **A node that fades out leaves the layout when its fade ends.** It could stay for good, nearly
+  transparent and holding its place, when the last frame of its timeline was not drawn; each
+  boundary of a phase now draws the node again on a timer of its own.
+- **A node that fades and is out of the layout takes no gap.** A hidden row of a list whose template
+  fades, and a hidden child of a column, left an empty space of one gap: they were drawn as an empty
+  view, which the column counted. Out of the layout they now draw no view at all.
+- The demo's contract samples carry `account.cardIndex` (dictionary 1.8.0), so the carousel fixtures
+  open with the content of their first card.
 - **A carousel that follows its stop value no longer stops short when the value changes twice in
   a row.** While the reader was still scrolling smoothly to the first target, a second value was
   compared with the stop the scroll was passing and taken for "already there". The follow now
