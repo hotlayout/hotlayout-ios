@@ -14,13 +14,18 @@ struct NodeView: View {
 
     /// The app bar the screen draws as its zone: it reads no fade.
     var isScreenZone = false
+    /// The caller put the node in a `FadingNode` of its own (a cell of a grid, which must tell the
+    /// layout that the cell is empty): the node draws itself whatever its condition says.
+    var fadeOutside = false
 
     var body: some View {
         if depth > DocumentReader.maxParseDepth {
             EmptyView()
+        } else if fadeOutside {
+            shownBody
         } else if VisibilityFade.reads(node, inZone: isScreenZone) {
             // The node decides by itself whether it is in the layout: a hidden one fades out first.
-            FadingNode(shown: context.isShown(node), context: "\(context.widthClass.rawValue)|\(context.locale.translation ?? "")") { shownBody }
+            FadingNode(shown: context.isShown(node), context: context.fadeContext) { shownBody }
         } else if context.isShown(node) {
             shownBody
         } else {

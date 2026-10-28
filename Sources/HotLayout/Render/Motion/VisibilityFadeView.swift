@@ -13,6 +13,17 @@ extension EnvironmentValues {
     }
 }
 
+extension RenderContext {
+    /// The language and the width class a condition is read in: a change of either is no transition.
+    var fadeContext: String { "\(widthClass.rawValue)|\(locale.translation ?? "")" }
+}
+
+/// Set on the cell of a grid that may be empty (a node fading in or out): the grid leaves a cell
+/// of no size out of its rows.
+struct CellMayBeAbsent: LayoutValueKey {
+    static let defaultValue = false
+}
+
 /// Frames at the display rate from `start` until `end`, then one more at `end`, and the schedule is over.
 private struct FadeSchedule: TimelineSchedule {
     let start: Date

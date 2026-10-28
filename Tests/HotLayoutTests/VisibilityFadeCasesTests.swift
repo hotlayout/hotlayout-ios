@@ -248,6 +248,54 @@ final class VisibilityFadeCasesTests: XCTestCase {
         XCTAssertFalse(try render(shown: false).isColor(25, 15, "#0000ff"), "hidden: not in the layout")
     }
 
+    private static let blue: JSONValue = ["kind": "color", "color": ["value": "#0000ff"]]
+    private static let green: JSONValue = ["kind": "color", "color": ["value": "#00ff00"]]
+
+    private func box(_ id: String, _ color: JSONValue, fades: Bool = false, shown: Bool = true) -> JSONValue {
+        var object = JSONObject([
+            ("id", .string(id)), ("type", "Container"), ("props", ["direction": "column", "gap": "none"]),
+            ("style", ["width": 40, "height": 20, "background": color]), ("children", []),
+        ])
+        if fades {
+            object["visibleIf"] = ["path": "flag", "op": "isTrue"]
+            object[VisibilityFade.field] = "fade"
+        }
+        return .object(object)
+    }
+
+    @MainActor
+    private func draw(parent: String, props: JSONObject, children: [JSONValue], flag: Bool) throws -> Pixels {
+        let node = ScreenSim.node(.object(["id": "p", "type": .string(parent), "props": .object(props), "children": .array(children)]))
+        var context = Harness.context(rightToLeft: false)
+        context.scope = ["flag": .bool(flag)]
+        let view = NodeView(node: node, context: context, placement: .natural).frame(width: 100, height: 60, alignment: .topLeading).background(Color.black)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1
+        return Pixels(try XCTUnwrap(renderer.cgImage))
+    }
+
+    @MainActor
+    func testAStackLayerThatFadesFollowsItsConditionAtRest() throws {
+        let children = [box("base", Self.green), box("top", Self.blue, fades: true)]
+        let stack: JSONObject = ["alignHorizontal": "start", "alignVertical": "start"]
+        XCTAssertTrue(try draw(parent: "Stack", props: stack, children: children, flag: true).isColor(10, 10, "#0000ff"), "shown: the layer is drawn")
+        XCTAssertTrue(try draw(parent: "Stack", props: stack, children: children, flag: false).isColor(10, 10, "#00ff00"), "hidden: the layer under it shows")
+    }
+
+    @MainActor
+    func testAGridCellThatFadesLeavesNoHoleWhenOutOfTheLayout() throws {
+        let children = [box("a", Self.blue, fades: true), box("b", Self.green), box("c", Self.green)]
+        let grid: JSONObject = ["columns": 2, "gap": "none"]
+        let hidden = try draw(parent: "Grid", props: grid, children: children, flag: false)
+        XCTAssertTrue(hidden.isColor(10, 10, "#00ff00"), "the next cell closes up into the first place")
+        XCTAssertFalse(hidden.isColor(10, 10, "#0000ff"))
+        XCTAssertTrue(hidden.isColor(60, 10, "#00ff00"), "and the third stands in the second column of the first row")
+        let shown = try draw(parent: "Grid", props: grid, children: children, flag: true)
+        XCTAssertTrue(shown.isColor(10, 10, "#0000ff"), "shown: the cell is where the document puts it")
+        XCTAssertTrue(shown.isColor(60, 10, "#00ff00"))
+        XCTAssertTrue(shown.isColor(10, 30, "#00ff00"))
+    }
+
     @MainActor
     func testTheFrameDraws() throws {
         let document = try HotlayoutDocument.load(try Contract.json("fixtures/visibility-fade-screens.json"))

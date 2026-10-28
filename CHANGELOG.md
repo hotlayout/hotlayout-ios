@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1 - Unreleased
+
+- **Fading nodes in a stack and in a grid.** A layer of a `Stack` and a cell of a `Grid` (or of a list
+  with `columns`) that names `visibilityTransition: 'fade'` fades like a child of a column: a grid no
+  longer drops it from its cells the moment its condition stops holding, and while it is out of the
+  layout the cell takes no place, so the other cells close up without a hole. The layer that gives
+  a stack its size is still counted by the document.
+
 ## 0.7.0 - Unreleased
 
 Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0).
@@ -16,8 +24,7 @@ Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0).
   Nothing fades on the first show of a screen, when the language or the width class changes, or
   under Reduce Motion: the node goes to its new state at once. The app
   bar of the screen, a pinned node (`pin` of any value), a navigation bar and its items follow
-  their condition at once, and so does a node inside a container that lays out only the children
-  it shows (a stack, a grid, tabs). Every row of the shared tables runs in the tests.
+  their condition at once, and so do the tabs and the parts of a composed text. Every row of the shared tables runs in the tests.
 
 ## 0.6.0 - Unreleased
 
