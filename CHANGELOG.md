@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.0 - Unreleased
+
+Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0).
+
+- **A node fades in and out when its condition changes.** A node with `visibilityTransition: 'fade'`
+  and a `visibleIf` no longer appears and disappears at once. When the condition stops holding on
+  a shown screen, the node keeps its place and fades out for 120 ms, then leaves the layout. When it
+  starts to hold, the node waits 120 ms out of the layout, then enters it transparent and fades in
+  for 160 ms, so two neighbours with opposite conditions are never in the layout together and the
+  layout changes once. A change during a transition goes to the new goal from the current opacity,
+  the time scaled by the distance; a node still waiting stays hidden. The times and the curves come
+  from the contract. A node that fades out catches no press and is not heard by VoiceOver from the
+  first moment; one that fades in is a control from the moment it enters the layout.
+  Nothing fades on the first show of a screen, when the language or the width class changes, or
+  under Reduce Motion: the node goes to its new state at once. The app
+  bar of the screen, a pinned node (`pin` of any value), a navigation bar and its items follow
+  their condition at once, and so does a node inside a container that lays out only the children
+  it shows (a stack, a grid, tabs). Every row of the shared tables runs in the tests.
+
 ## 0.6.0 - Unreleased
 
 Reads document contract **9.32.0** (theme 4.0.1, icon set 1.0.0).

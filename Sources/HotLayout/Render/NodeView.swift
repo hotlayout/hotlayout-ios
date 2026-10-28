@@ -12,25 +12,38 @@ struct NodeView: View {
     /// The parent paints the motion itself, outside the turn of a layer (`Stack`).
     var motionOutside = false
 
+    /// The app bar the screen draws as its zone: it reads no fade.
+    var isScreenZone = false
+
     var body: some View {
-        if depth > DocumentReader.maxParseDepth || !context.isShown(node) {
+        if depth > DocumentReader.maxParseDepth {
             EmptyView()
+        } else if VisibilityFade.reads(node, inZone: isScreenZone) {
+            // The node decides by itself whether it is in the layout: a hidden one fades out first.
+            FadingNode(shown: context.isShown(node), context: "\(context.widthClass.rawValue)|\(context.locale.translation ?? "")") { shownBody }
+        } else if context.isShown(node) {
+            shownBody
         } else {
-            let style = effectiveStyle()
-            let inner = context.with(inherited: NodeStyle.inherited(context.inherited, style: style, resolver: context.resolver)).withoutPosition()
-            let look = context.resolver.box(style, scope: context.scope)
-            // The padding of a carousel lies inside its scroll: the first card stands a padding
-            // from the edge and the last one scrolls past it.
-            let carousel = CarouselRules.of(node) != nil
-            let shaped = boxLook(look, carousel: carousel)
-            let box = widget(inner, style: style, space: hostSpace(look), carouselPadding: carousel ? look.padding : nil)
-                .modifier(WriteControlTraits(node: node, context: inner))
-                .modifier(NodeBoxModifier(look: shaped.withoutMargin, placement: placementWithMainAxis, context: inner))
-            // The press target is the box of the node without its margin; the motion moves that box.
-            pressable(box, inner)
-                .nodeMotion(motionOutside || node.widget == .screen ? nil : NodeMotion.read(node.fields["motion"]), rightToLeft: context.rightToLeft)
-                .padding(shaped.margin.edgeInsets)
+            EmptyView()
         }
+    }
+
+    @ViewBuilder
+    private var shownBody: some View {
+        let style = effectiveStyle()
+        let inner = context.with(inherited: NodeStyle.inherited(context.inherited, style: style, resolver: context.resolver)).withoutPosition()
+        let look = context.resolver.box(style, scope: context.scope)
+        // The padding of a carousel lies inside its scroll: the first card stands a padding
+        // from the edge and the last one scrolls past it.
+        let carousel = CarouselRules.of(node) != nil
+        let shaped = boxLook(look, carousel: carousel)
+        let box = widget(inner, style: style, space: hostSpace(look), carouselPadding: carousel ? look.padding : nil)
+            .modifier(WriteControlTraits(node: node, context: inner))
+            .modifier(NodeBoxModifier(look: shaped.withoutMargin, placement: placementWithMainAxis, context: inner))
+        // The press target is the box of the node without its margin; the motion moves that box.
+        pressable(box, inner)
+            .nodeMotion(motionOutside || node.widget == .screen ? nil : NodeMotion.read(node.fields["motion"]), rightToLeft: context.rightToLeft)
+            .padding(shaped.margin.edgeInsets)
     }
 
     /// The effective style; an app bar that is the zone of its screen lays its scrolled style over

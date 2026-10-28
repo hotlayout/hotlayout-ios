@@ -130,7 +130,8 @@ struct ScreenRootView: View {
     @ViewBuilder
     private func barZone(_ plan: Plan, inner: RenderContext) -> some View {
         if let bar = plan.bar {
-            let view = NodeView(node: bar, context: barContext(inner, plan), placement: .stretched, depth: 1, parentType: WidgetType.screen.rawValue)
+            let view = NodeView(
+                node: bar, context: barContext(inner, plan), placement: .stretched, depth: 1, parentType: WidgetType.screen.rawValue, isScreenZone: true)
                 .background(
                     GeometryReader { proxy in
                         Color.clear.onAppear { barHeight = Double(proxy.size.height) }.onChange(of: proxy.size.height) { barHeight = Double($0) }
