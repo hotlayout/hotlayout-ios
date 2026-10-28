@@ -9,7 +9,7 @@ struct RepeaterWidget: View {
     /// The padding of the node when it is a carousel (drawn inside the scroll).
     var carouselPadding: Sides?
 
-    private enum Entry {
+    private enum Entry: Hashable {
         case header(Int)
         case record(Int)
     }
@@ -44,18 +44,19 @@ struct RepeaterWidget: View {
         // A header goes before the first record of each group, in the scope of that record; one
         // hidden by its own condition takes no place and no gap. Groups exist in a column only.
         let grouped = columns == nil && node.props["direction"]?.stringValue != "row" && node.props["carousel"] == nil
+        let keeps = Set(plan.drawn(templateFades: VisibilityFade.reads(template)))
         var entries: [Entry] = []
         for (index, instance) in plan.instances.enumerated() {
             if grouped, instance.headerBefore, let header, context.isShown(header, scope: instance.scope) {
                 entries.append(.header(index))
             }
-            if instance.shown { entries.append(.record(index)) }
+            if keeps.contains(index) { entries.append(.record(index)) }
         }
 
         return Group {
             if let columns {
                 GridCellsLayout(columns: columns, gap: gap) {
-                    ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                    ForEach(entries, id: \.self) { entry in
                         if case .record(let index) = entry {
                             TightSlot(node: template, context: itemContext(index), depth: depth + 1)
                         }
@@ -77,7 +78,7 @@ struct RepeaterWidget: View {
             } else if node.props["direction"]?.stringValue == "row" || node.props["carousel"] != nil {
                 // A row of natural-width instances. A `carousel` the reader cannot read is a plain scroll.
                 let row = RowLayout(gap: gap, justify: .start, align: .center) {
-                    ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                    ForEach(entries, id: \.self) { entry in
                         if case .record(let index) = entry {
                             NodeView(node: template, context: itemContext(index), placement: .natural, depth: depth + 1)
                         }
@@ -90,7 +91,7 @@ struct RepeaterWidget: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: gap) {
-                    ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                    ForEach(entries, id: \.self) { entry in
                         switch entry {
                         case .header(let index):
                             if let header { NodeView(node: header, context: itemContext(index).with(numbered: nil), placement: .stretched, depth: depth + 1) }

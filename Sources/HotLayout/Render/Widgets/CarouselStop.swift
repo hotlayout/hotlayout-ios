@@ -75,6 +75,8 @@ final class CarouselStopController {
     private var person = false
     private var holding = false
     private var dirty = false
+    /// The stop the reader is scrolling towards (the target of its last scroll) until that scroll settles.
+    private var heading: Int?
     private var cancelTimer: (() -> Void)?
     private let later: Later
 
@@ -112,7 +114,7 @@ final class CarouselStopController {
         let before = previous
         previous = value
         guard !holding else { return }
-        let active = CarouselRules.activeStop(stops, offset: offset)
+        let active = heading ?? CarouselRules.activeStop(stops, offset: offset)
         if let target = CarouselStop.follow(previous: before, next: value, stopCount: stops.count, active: active) {
             move(to: target, animated: !reducedMotion)
         }
@@ -120,9 +122,11 @@ final class CarouselStopController {
 
     /// A move by the reader: it never writes.
     private func move(to index: Int, animated: Bool) {
-        guard index >= 0, index < stops.count, abs(offset - stops[index]) >= 0.5 else { return }
+        guard index >= 0, index < stops.count else { return }
+        if heading == nil && abs(offset - stops[index]) < 0.5 { return }
         person = false
         dirty = false
+        heading = index
         cancelTimer?()
         cancelTimer = nil
         scrollToStop?(index, animated)
@@ -135,12 +139,14 @@ final class CarouselStopController {
         guard path != nil else { return }
         person = true
         holding = true
+        heading = nil
     }
 
     /// A person moves the row without holding it (a wheel, a key): the next settled stop is theirs.
     func personMoved() {
         guard path != nil else { return }
         person = true
+        heading = nil
     }
 
     /// The finger lifted. A release where the scroll already stands gives no more offsets, so the
@@ -154,7 +160,9 @@ final class CarouselStopController {
     /// The offset of the scroll, from the logical start, changed.
     func scrolled(to newOffset: Double) {
         offset = newOffset
-        guard path != nil, person else { return }
+        guard path != nil else { return }
+        if heading != nil && !person { quiet(); return }
+        guard person else { return }
         dirty = true
         quiet()
     }
@@ -163,6 +171,7 @@ final class CarouselStopController {
     func settle() {
         cancelTimer?()
         cancelTimer = nil
+        if !holding { heading = nil }
         guard path != nil, dirty, person, !holding else { return }
         dirty = false
         person = false

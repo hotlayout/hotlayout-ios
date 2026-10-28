@@ -282,3 +282,69 @@ private final class ScreenRun {
         }
     }
 }
+
+/// The host changes the number twice while the reader still scrolls smoothly to the first target:
+/// the second target is compared with where the scroll is heading, not with the stop it passes.
+final class CarouselStopRaceTests: XCTestCase {
+    private var timers: [(due: Double, action: () -> Void, live: Bool)] = []
+    private var now = 0.0
+    private var targets: [Int] = []
+    private var controller: CarouselStopController!
+    private let stops = [0.0, 270.0, 540.0]
+
+    private func make(start: Int) {
+        controller = CarouselStopController(later: { [unowned self] seconds, action in
+            let index = timers.count
+            timers.append((now + seconds * 1000, action, true))
+            return { [unowned self] in timers[index].live = false }
+        })
+        controller.path = "a.b"
+        controller.current = .number(Double(start))
+        controller.write = { _, _ in XCTFail("the reader never writes") }
+        controller.scrollToStop = { [unowned self] index, _ in targets.append(index) }
+        controller.observe(stops: stops)
+        controller.scrolled(to: stops[start])
+        targets = []
+    }
+
+    private func advance(_ ms: Double) {
+        now += ms
+        for index in timers.indices where timers[index].live && timers[index].due <= now {
+            timers[index].live = false
+            timers[index].action()
+        }
+    }
+
+    func testASecondTargetDuringTheFirstScrollIsNotTakenForArrival() {
+        make(start: 2)
+        controller.update(value: .number(0))
+        XCTAssertEqual(targets, [0])
+        controller.scrolled(to: 400)
+        controller.scrolled(to: 270)  // passing the stop 1 on the way to 0
+        controller.update(value: .number(1))
+        XCTAssertEqual(targets, [0, 1])
+    }
+
+    func testOnceTheScrollSettledTheStopAtRestIsUsed() {
+        make(start: 2)
+        controller.update(value: .number(0))
+        controller.scrolled(to: 0)
+        advance(CarouselStop.settleSeconds * 1000 + 1)
+        controller.update(value: .number(0))
+        controller.update(value: .number(1))
+        XCTAssertEqual(targets, [0, 1])
+        controller.scrolled(to: 270)
+        advance(CarouselStop.settleSeconds * 1000 + 1)
+        controller.update(value: .number(1))  // same number: nothing
+        XCTAssertEqual(targets, [0, 1])
+    }
+
+    func testAPersonMovingTheRowForgetsTheHeading() {
+        make(start: 2)
+        controller.update(value: .number(0))
+        controller.personMoved()
+        controller.scrolled(to: 270)
+        controller.update(value: .number(1))
+        XCTAssertEqual(targets, [0])  // the person put the row on the stop 1 already
+    }
+}

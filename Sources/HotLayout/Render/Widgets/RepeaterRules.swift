@@ -66,6 +66,12 @@ struct RepeaterPlan {
 
     let instances: [Instance]
 
+    /// The instances a list puts in its layout. A template that fades keeps a hidden instance too:
+    /// the instance decides by itself when it leaves the layout, so it fades apart from its neighbours.
+    func drawn(templateFades: Bool) -> [Int] {
+        instances.indices.filter { instances[$0].shown || templateFades }
+    }
+
     static func limit(_ props: JSONObject) -> Int? {
         guard let raw = props["limit"], !raw.isNull else { return nil }
         // A number outside its bounds, or not a number, is the lower bound (`nonNumericLiteral`).

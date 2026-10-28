@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2 - Unreleased
+
+- **A carousel that follows its stop value no longer stops short when the value changes twice in
+  a row.** While the reader was still scrolling smoothly to the first target, a second value was
+  compared with the stop the scroll was passing and taken for "already there". The follow now
+  starts from the target of the reader's own last scroll until that scroll settles, or until a
+  person moves the row.
+- **A node of a list template that fades does so apart from the other rows.** An instance whose
+  condition stops holding stays in the list while it fades out (it used to leave at once), and the
+  rows of a list are keyed by their record, so a row that leaves does not hand its state to the next.
+
 ## 0.7.1 - Unreleased
 
 - **Fading nodes in a stack and in a grid.** A layer of a `Stack` and a cell of a `Grid` (or of a list

@@ -307,3 +307,30 @@ final class VisibilityFadeCasesTests: XCTestCase {
         XCTAssertNotNil(renderer.cgImage)
     }
 }
+
+/// A node of a list template that fades does so apart from its neighbours: its instance stays in
+/// the list while the condition of that record fades it out.
+final class RepeaterFadeTests: XCTestCase {
+    private func plan(fades: Bool, on: [Bool]) -> RepeaterPlan {
+        var template: JSONObject = ["id": "row", "type": "Text", "props": ["text": "x"], "visibleIf": ["path": "row.on", "op": "isTrue"]]
+        if fades { template[VisibilityFade.field] = "fade" }
+        let node = ScreenSim.node(
+            .object([
+                "id": "list", "type": "Repeater", "props": ["source": "rows", "item": "row"],
+                "children": [.object(template)],
+            ]))
+        var scope = DataScope()
+        scope["rows"] = .array(on.map { .object(["on": .bool($0)]) })
+        return RepeaterPlan(node: node, scope: scope)
+    }
+
+    func testAHiddenInstanceOfAFadingTemplateStaysSoThatItCanFadeApart() {
+        let fading = plan(fades: true, on: [true, false, true])
+        XCTAssertEqual(fading.drawn(templateFades: true), [0, 1, 2])
+        XCTAssertEqual(fading.instances.map(\.shown), [true, false, true])
+    }
+
+    func testWithoutTheFieldAHiddenInstanceIsLeftOutAtOnce() {
+        XCTAssertEqual(plan(fades: false, on: [true, false, true]).drawn(templateFades: false), [0, 2])
+    }
+}
