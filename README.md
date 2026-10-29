@@ -282,6 +282,13 @@ the reader's own rule (https only) is not relaxed. `-app obsidian|sunny|orbit -s
 contract, and `-fixture <name> -screen <screenId> -locale <tag>` opens one screen of it. What the tests check
 is described in [Tests/README.md](Tests/README.md).
 
+## Learn more
+
+- Website: [hotlayout.com](https://hotlayout.com)
+- Documentation: [hotlayout.com/docs](https://hotlayout.com/docs), including the [quickstart for this platform](https://hotlayout.com/docs/integrator/quickstart-ios)
+- Video quickstart: [YouTube](https://youtu.be/Qrbz3ztlfDQ)
+- Getting the builder: screens are made in the HotLayout builder, hosted at hotlayout.com or self-hosted. To get access, use "Get access" on [hotlayout.com](https://hotlayout.com) or write to [contact@hotlayout.com](mailto:contact@hotlayout.com).
+
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE). The icon drawings include icons from Lucide (ISC);
