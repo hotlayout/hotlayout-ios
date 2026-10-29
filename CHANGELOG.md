@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.7.2 - Unreleased
+## 0.4.0 - 2026-10-29
+
+Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0) and placement map **1.1.0**. Folds in the entries that were prepared as 0.5.0 to 0.7.2 and never published (the last release is 0.3.0).
 
 - **Placement schedule (placement contract 1.1.0).** A place may carry promotions with a `from`
   and an `until` (UTC, `until` excluded) that replace its permanent content for their window; an
@@ -31,17 +33,11 @@
   condition stops holding stays in the list while it fades out (it used to leave at once), and the
   rows of a list are keyed by their record, so a row that leaves does not hand its state to the next.
 
-## 0.7.1 - Unreleased
-
 - **Fading nodes in a stack and in a grid.** A layer of a `Stack` and a cell of a `Grid` (or of a list
   with `columns`) that names `visibilityTransition: 'fade'` fades like a child of a column: a grid no
   longer drops it from its cells the moment its condition stops holding, and while it is out of the
   layout the cell takes no place, so the other cells close up without a hole. The layer that gives
   a stack its size is still counted by the document.
-
-## 0.7.0 - Unreleased
-
-Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0).
 
 - **A node fades in and out when its condition changes.** A node with `visibilityTransition: 'fade'`
   and a `visibleIf` no longer appears and disappears at once. When the condition stops holding on
@@ -57,10 +53,6 @@ Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0).
   bar of the screen, a pinned node (`pin` of any value), a navigation bar and its items follow
   their condition at once, and so do the tabs and the parts of a composed text. Every row of the shared tables runs in the tests.
 
-## 0.6.0 - Unreleased
-
-Reads document contract **9.32.0** (theme 4.0.1, icon set 1.0.0).
-
 - **A carousel tells its active stop.** A carousel (a scrolling `Row` or a `Repeater` in a row) may
   name a number data path in `carousel.stopPath`. When a person swipes it and the scroll settles on
   a stop, the reader writes the number of that stop, counted from 0 (stops, not cards), the way an
@@ -73,10 +65,6 @@ Reads document contract **9.32.0** (theme 4.0.1, icon set 1.0.0).
   animation under Reduce Motion). A write the host refused leaves the carousel where the person
   put it. A path of a wrong shape counts as no path. The scroll counts as settled after a quiet
   time of 150 ms. A gesture the system cancels counts as a finger lifted. Every row of the shared table runs in the tests.
-
-## 0.5.0 - Unreleased
-
-Reads document contract **9.31.0** (theme 4.0.1, icon set 1.0.0).
 
 - **Bottom safe inset of a modal sheet.** A sheet reaches the physical bottom of the area, and the
   home indicator no longer covers its last node: the reader adds the bottom safe inset of the
