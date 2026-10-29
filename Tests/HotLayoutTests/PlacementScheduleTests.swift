@@ -147,4 +147,40 @@ final class PlacementScheduleTests: XCTestCase {
         )
         XCTAssertEqual(viaLoad.document?.documentId, "d-sale", "load resolves by the injected clock")
     }
+
+    func testDocumentsOfAllWindowsAreReadAheadAndSurviveLostNetwork() async throws {
+        let files = Files()
+        let root = "/orgs/o/projects/p"
+        files.put(
+            root + "/placements/published.json",
+            #"{"placementsVersion":"1.1.0","placements":{"home.banner":{"documentId":"d-everyday","schedule":[{"documentId":"d-sale","entry":"sale","from":"2026-11-27T22:00:00Z","until":"2026-11-30T22:00:00Z"}]}}}"#
+        )
+        files.put(root + "/documents/d-everyday/published.json", document("d-everyday"))
+        files.put(root + "/documents/d-sale/published.json", document("d-sale"))
+        let server = try LocalServer { request in
+            guard let body = files.get(request.path) else { return LocalServer.Response(status: 404, headers: ["Content-Length": "0"]) }
+            let data = Data(body.utf8)
+            return LocalServer.Response(status: 200, headers: ["Content-Type": "application/json", "Content-Length": String(data.count)], chunks: AnyIterator([data].makeIterator()))
+        }
+        let base = URL(string: server.base + root)!
+        let documents = HotlayoutMemoryPlacementDocumentStore()
+        let before = try date("2026-11-01T00:00:00Z")
+        let read = await HotlayoutPlacement.read(
+            name: "home.banner", projectBase: base, bundledMap: nil, store: HotlayoutMemoryPlacementStore(), documents: documents, session: nil, clock: { before }
+        )
+        let context = try XCTUnwrap(read.context)
+        XCTAssertEqual(files.count(root + "/documents/d-sale/published.json"), 0, "nothing ahead is read before the prefetch")
+        await HotlayoutPlacement.prefetch("home.banner", context: context)
+        XCTAssertEqual(files.count(root + "/documents/d-sale/published.json"), 1)
+
+        server.stop()  // the network is lost
+        let sale = await HotlayoutPlacement.show("home.banner", context: context, at: try date("2026-11-28T00:00:00Z"))
+        XCTAssertEqual(sale.document?.documentId, "d-sale", "the window opens with no network")
+        XCTAssertEqual(sale.entry, "sale")
+        let after = await HotlayoutPlacement.show("home.banner", context: context, at: try date("2026-12-01T00:00:00Z"))
+        XCTAssertEqual(after.document?.documentId, "d-everyday", "and gives the permanent content back with no network")
+        let foreground = await HotlayoutPlacement.show("home.banner", context: context, at: before)
+        XCTAssertEqual(foreground.document?.documentId, "d-everyday", "a resolve offline does not blank the shown document")
+        XCTAssertNil(foreground.report)
+    }
 }

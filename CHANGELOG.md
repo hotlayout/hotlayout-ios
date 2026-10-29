@@ -12,6 +12,11 @@ Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0) and placement m
   and `nextBoundary(_:after:)`, and a `clock:` parameter on `HotlayoutPlacement.load` and
   `HotlayoutPlacementView`. A broken item is skipped whole and spoils nothing else.
 
+- **A place with a schedule shows its promotion on time and with no network.** After the first
+  reading the documents of every window of the place are read in the background and kept (up to 64;
+  a failed read keeps the last copy, a 404 removes it), so an edge of the schedule, or a return to the
+  foreground while offline, no longer blanks the place for want of a document that was never read.
+
 - **A carousel with `stopPath` stays on the stop a person swiped to.** From the second swipe on, the
   row went back to the stop before about half a second after it settled. The change of the value
   was handed to the carousel from the draw before the change, so each write was followed as a change

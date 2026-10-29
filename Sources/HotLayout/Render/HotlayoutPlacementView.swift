@@ -9,7 +9,8 @@ import SwiftUI
 /// The place is loaded once per `name` and `projectBase`; the view does not poll. The map is not
 /// asked again when a scheduled window begins or ends: the view sets a timer for the next edge of
 /// the schedule and resolves the place again by the device clock (`clock`), and does so too when
-/// the app comes back to the foreground, since the clock may have been set. What the view
+/// the app comes back to the foreground, since the clock may have been set. After the first
+/// reading the documents of the other windows are read and kept, so an edge needs no network. What the view
 /// does not draw it reports: `onPlacement` is called with the first settled state of a place and
 /// with every change of `placement.event` after it, so the host can show its own fallback when
 /// `placement.document` is `nil` and take it away when the document comes back. When the name or
@@ -84,6 +85,8 @@ public struct HotlayoutPlacementView<Content: View>: View {
             events.context = loaded.context
             apply(loaded.placement)
             scheduleRun += 1
+            // Last, and in this task: it ends with the place, and the shown document is not waited for.
+            if let context = loaded.context { await HotlayoutPlacement.prefetch(name, context: context) }
         }
         .task(id: scheduleRun) { await followSchedule() }
         .onChange(of: scenePhase) { phase in

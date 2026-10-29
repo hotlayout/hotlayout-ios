@@ -33,6 +33,11 @@ public struct HotlayoutPlacement: Sendable {
     /// Documents are kept for the places the map in use names, one for each, and the others are
     /// removed after a fresh map is read.
     ///
+    /// Once the place is decided, the documents of every window of its schedule are read in the
+    /// background and kept, so a window that opens later shows its document with no network, and
+    /// the place that is shown goes on being shown when the network is lost. A failed read keeps
+    /// the last copy; a 404 removes it. At most 64 documents are read this way.
+    ///
     /// Never throws: every failure is a `report`.
     ///
     /// - Parameters:
@@ -51,10 +56,25 @@ public struct HotlayoutPlacement: Sendable {
         session: URLSession? = nil,
         clock: @escaping @Sendable () -> Date = { Date() }
     ) async -> HotlayoutPlacement {
-        await read(
+        let loaded = await read(
             name: name, projectBase: projectBase, bundledMap: bundledMap, store: store, documents: documents, session: session, clock: clock
-        ).placement
+        )
+        if let context = loaded.context, !Task.isCancelled {
+            Task.detached(priority: .utility) { await prefetch(name, context: context) }
+        }
+        return loaded.placement
     }
+
+    /// Reads and keeps the documents of every window of the place `name`, the one in force
+    /// included (it is asked with its kept `ETag`, so an unchanged one costs no body).
+    static func prefetch(_ name: String, context: Context) async {
+        for id in context.map.documentIds(of: name).prefix(prefetchMax) {
+            guard !Task.isCancelled else { return }
+            _ = await loadDocument(id: id, base: context.projectBase, documents: context.documents, transport: context.transport)
+        }
+    }
+
+    private static let prefetchMax = 64
 
     /// The map in use and what is needed to resolve the place again without asking for the map.
     struct Context {

@@ -118,6 +118,18 @@ extension HotlayoutPlacementMap {
         return PlacementWindow.nextBoundary(PlacementWindow.read(place), after: now.timeIntervalSince1970)
     }
 
+    /// The ids of the documents the place `name` can show: its permanent content, then every
+    /// readable window, each once, in the order of the map. Empty for a place that is unknown or
+    /// unreadable.
+    func documentIds(of name: String) -> [String] {
+        guard case .place(let place, let permanent) = lookup(name) else { return [] }
+        var ids: [String] = []
+        for id in [permanent.documentId] + PlacementWindow.read(place).map(\.resolution.documentId) {
+            if let id, !ids.contains(id) { ids.append(id) }
+        }
+        return ids
+    }
+
     /// The ids of documents of readable scheduled items of every place (kept for the day they start).
     func scheduledDocumentIds() -> Set<String> {
         guard reading == .map else { return [] }
