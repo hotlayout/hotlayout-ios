@@ -41,14 +41,35 @@ public struct HotlayoutPlacement: Sendable {
     ///   - store: where the last known map is kept; `UserDefaults` by default.
     ///   - documents: where the documents read last are kept; files in the caches directory by default.
     ///   - session: the session to ask with; an ephemeral one with a 20-second limit by default.
+    ///   - clock: the moment the schedule of the place is resolved at; the device clock by default.
     public static func load(
         name: String,
         projectBase: URL,
         bundledMap: String? = nil,
         store: HotlayoutPlacementStore = HotlayoutUserDefaultsPlacementStore(),
         documents: HotlayoutPlacementDocumentStore = HotlayoutFilePlacementDocumentStore(),
-        session: URLSession? = nil
+        session: URLSession? = nil,
+        clock: @escaping @Sendable () -> Date = { Date() }
     ) async -> HotlayoutPlacement {
+        await read(
+            name: name, projectBase: projectBase, bundledMap: bundledMap, store: store, documents: documents, session: session, clock: clock
+        ).placement
+    }
+
+    /// The map in use and what is needed to resolve the place again without asking for the map.
+    struct Context {
+        let map: HotlayoutPlacementMap
+        let mapStatus: HotlayoutPlacementMapStatus
+        let projectBase: URL
+        let documents: HotlayoutPlacementDocumentStore
+        let transport: PlacementTransport
+    }
+
+    /// Reads the map, then shows the place at the moment the clock gives once the map is in.
+    static func read(
+        name: String, projectBase: URL, bundledMap: String?, store: HotlayoutPlacementStore,
+        documents: HotlayoutPlacementDocumentStore, session: URLSession?, clock: @Sendable () -> Date
+    ) async -> (placement: HotlayoutPlacement, context: Context?) {
         let transport = PlacementTransport(session: session ?? PlacementTransport.defaultSession())
         let mapURL = projectBase.appendingPathComponent("placements").appendingPathComponent("published.json")
         let mapKey = mapURL.absoluteString
@@ -57,7 +78,7 @@ public struct HotlayoutPlacement: Sendable {
         let etag = lastKnownReadable ? store.value(forKey: mapKey + ".etag") : nil
         let reply = await transport.get(mapURL, etag: etag, maxBytes: PlacementBody.maxBytes)
         // A cancelled load changes nothing: the caller has moved on.
-        guard !Task.isCancelled else { return cancelled(name) }
+        guard !Task.isCancelled else { return (cancelled(name), nil) }
 
         let outcome = PlacementAnswer.map(reply)
         let decision = PlacementSource.pick(network: outcome, lastKnown: lastKnown, bundled: bundledMap)
@@ -66,19 +87,26 @@ public struct HotlayoutPlacement: Sendable {
             store.set(reply.etag, forKey: mapKey + ".etag")
         }
 
-        let resolution = decision.map.resolve(name)
         if decision.status == .fresh { prune(documents, base: projectBase, keeping: decision.map.documentIds()) }
+        let context = Context(map: decision.map, mapStatus: decision.status, projectBase: projectBase, documents: documents, transport: transport)
+        return (await show(name, context: context, at: clock()), context)
+    }
+
+    /// What the place shows at `now` with the map already read: the document of the item in
+    /// force, read the way a permanent one is. Asks no map.
+    static func show(_ name: String, context: Context, at now: Date) async -> HotlayoutPlacement {
+        let resolution = context.map.resolve(name, at: now)
         var document: HotlayoutDocument?
         var documentOutcome: PlacementDocumentOutcome?
         if resolution.status == .document, let id = resolution.documentId {
-            let read = await loadDocument(id: id, base: projectBase, documents: documents, transport: transport)
+            let read = await loadDocument(id: id, base: context.projectBase, documents: context.documents, transport: context.transport)
             guard !Task.isCancelled else { return cancelled(name) }
             document = read.document
             documentOutcome = read.outcome
         }
         let showing = PlacementShowing.of(resolution, document: documentOutcome)
         return HotlayoutPlacement(
-            name: name, mapStatus: decision.status, resolution: resolution,
+            name: name, mapStatus: context.mapStatus, resolution: resolution,
             document: showing.showsDocument ? document : nil, entry: showing.entry, report: showing.report
         )
     }

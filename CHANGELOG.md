@@ -2,6 +2,14 @@
 
 ## 0.7.2 - Unreleased
 
+- **Placement schedule (placement contract 1.1.0).** A place may carry promotions with a `from`
+  and an `until` (UTC, `until` excluded) that replace its permanent content for their window; an
+  item without a document is a pause and the place is empty. The reader resolves the schedule by
+  the device clock, sets a timer for the next edge, and resolves again when the app returns to
+  the foreground; the map is not asked again on an edge. New: `HotlayoutPlacementMap.resolve(_:at:)`
+  and `nextBoundary(_:after:)`, and a `clock:` parameter on `HotlayoutPlacement.load` and
+  `HotlayoutPlacementView`. A broken item is skipped whole and spoils nothing else.
+
 - **A carousel with `stopPath` stays on the stop a person swiped to.** From the second swipe on, the
   row went back to the stop before about half a second after it settled. The change of the value
   was handed to the carousel from the draw before the change, so each write was followed as a change

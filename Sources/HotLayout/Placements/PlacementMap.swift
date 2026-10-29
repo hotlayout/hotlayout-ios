@@ -3,7 +3,7 @@ import Foundation
 /// The version of the placement contract this reader is written against
 /// (`x-placementsVersion` of `placements.json`).
 extension HotlayoutVersions {
-    public static let placements = "1.0.0"
+    public static let placements = "1.1.0"
 }
 
 /// What stands in a named place of the app, after a tolerant read of the map.
@@ -90,20 +90,42 @@ public struct HotlayoutPlacementMap: Equatable, Sendable {
         self.places = places
     }
 
-    /// The ids of the documents the places of this map name (the ones of a readable form).
+    /// The ids of the documents the places of this map name (the ones of a readable form), the
+    /// scheduled ones included.
     func documentIds() -> Set<String> {
         guard reading == .map else { return [] }
-        return Set(places.keys.compactMap { resolve($0).documentId })
+        return Set(places.keys.compactMap { resolve($0).documentId }).union(scheduledDocumentIds())
     }
 
-    /// What stands in the place `name`.
-    ///
+    /// What a name turned out to be in the map; the permanent content is already checked.
+    enum Lookup {
+        case unknown
+        case unreadable
+        case place(JSONObject, permanent: HotlayoutPlacementResolution)
+
+        var resolution: HotlayoutPlacementResolution {
+            switch self {
+            case .unknown: return HotlayoutPlacementResolution(status: .unknown)
+            case .unreadable: return HotlayoutPlacementResolution(status: .unreadable)
+            case .place(_, let permanent): return permanent
+            }
+        }
+    }
+
     /// The order of the checks is part of the rule: a map that could not be read gives
     /// `unreadable` to any name; a name of the wrong form is `unknown`; then the map's own key.
-    public func resolve(_ name: String) -> HotlayoutPlacementResolution {
-        guard reading == .map else { return HotlayoutPlacementResolution(status: .unreadable) }
-        guard PlacementForms.isName(name), let record = places[name] else { return HotlayoutPlacementResolution(status: .unknown) }
-        guard let place = record.objectValue, let documentId = place["documentId"] else { return HotlayoutPlacementResolution(status: .unreadable) }
+    func lookup(_ name: String) -> Lookup {
+        guard reading == .map else { return .unreadable }
+        guard PlacementForms.isName(name), let record = places[name] else { return .unknown }
+        guard let place = record.objectValue, let documentId = place["documentId"] else { return .unreadable }
+        let permanent = Self.permanent(place, documentId: documentId)
+        return permanent.status == .unreadable ? .unreadable : .place(place, permanent: permanent)
+    }
+
+    /// What stands in the place `name` for good, without a schedule; see `resolve(_:at:)`.
+    public func resolve(_ name: String) -> HotlayoutPlacementResolution { lookup(name).resolution }
+
+    private static func permanent(_ place: JSONObject, documentId: JSONValue) -> HotlayoutPlacementResolution {
         if documentId.isNull { return HotlayoutPlacementResolution(status: .empty) }
         guard let id = documentId.stringValue, PlacementForms.isDocumentId(id) else { return HotlayoutPlacementResolution(status: .unreadable) }
         // `entry: null` is the same as no entry: backends often write null for absence.

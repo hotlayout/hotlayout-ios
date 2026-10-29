@@ -181,9 +181,47 @@ segments; a name of another form is `unknown` and no request is made for it. Use
 `HotlayoutPlacementView(name:projectBase:…content:)` to draw with a `HotlayoutScreen` of your own
 configuration, and `store:` (the last known map), `documents:` (the documents read, files in the caches directory
 by default) and `session:` to choose where the last known copies live and how the requests are
-made. Redirects are not followed and a request is given up after 20 seconds. The view loads once
-per name; it does not poll. `onPlacement` is called with the first state and again whenever
+made. Redirects are not followed and a request is given up after 20 seconds. The view loads the
+map once per name; it does not poll. `onPlacement` is called with the first state and again whenever
 `placement.event` (`status`, `report`, `mapStatus`, `documentId`, `entry`) changes.
+
+### Schedule
+
+A place may carry a schedule: promotions `{documentId, entry?, from, until}` shown over its
+permanent content while `from` (included) to `until` (excluded) lasts, in UTC. An item with
+`documentId: null` is a pause: the place is empty (`report == .empty`) for its window. After the last window the
+permanent content is back.
+
+The schedule is resolved by the clock of the device, without a network. The view sets a timer for
+the next edge of the schedule and, when it fires, resolves the place again: it does not ask for
+the map again, and only reads the document the new window brings. It also resolves again when the
+app returns to the foreground, because the clock may have been set. The change is an ordinary
+`onPlacement` event (`documentId`, `entry`, and `empty` to `document` and back); if the answer is
+the same, there is no event. `HotlayoutPlacement.load(…, clock:)` and
+`HotlayoutPlacementView(…, clock:)` take the clock (`@Sendable () -> Date`, the device clock by
+default), which is how you test a schedule; `HotlayoutPlacementMap` has `resolve(_:at:)` and
+`nextBoundary(_:after:)` to ask a map yourself.
+
+An empty place draws nothing, but the view stays in your layout, and so do the padding and the
+frame you put around it. Take your own out when the place is empty:
+
+```swift
+struct HomeBanner: View {
+    let projectBase: URL
+    @State private var empty = false
+
+    var body: some View {
+        HotlayoutPlacementView(
+            name: "home.banner",
+            projectBase: projectBase,
+            onPlacement: { placement in empty = placement.document == nil }
+        )
+        // The view stays mounted so that it can wake up on the next window.
+        .padding(.horizontal, empty ? 0 : 16)
+        .padding(.vertical, empty ? 0 : 8)
+    }
+}
+```
 
 ## What the reader does and does not do
 
