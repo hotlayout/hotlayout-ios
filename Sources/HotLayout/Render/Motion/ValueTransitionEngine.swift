@@ -34,6 +34,9 @@ struct ValueTransitionEngine {
         var literal: (stepped: Double, smooth: Double)?
         /// The ends of every scale run in progress, by path (`#value` for a literal).
         var ends: [String: Ends]
+        /// A run is in progress: the node is measured with its data as they are (the final
+        /// values) and the stepped or smooth numbers are only painted over that place.
+        var held = false
 
         static func plain(_ scope: DataScope) -> Shown { Shown(stepped: scope, smooth: scope, literal: nil, ends: [:]) }
     }
@@ -141,6 +144,7 @@ struct ValueTransitionEngine {
     func shown(_ scope: DataScope) -> Shown {
         if runs.isEmpty { return .plain(scope) }
         var result = Shown.plain(scope)
+        result.held = true
         for (path, run) in runs {
             let step = shownNow(path, smooth: false)
             let flow = run.scale ? shownNow(path, smooth: true) : step

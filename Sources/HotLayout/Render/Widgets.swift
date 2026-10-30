@@ -13,10 +13,12 @@ struct StyledText: View {
     var maxLines: Int?
     var truncate = true
     @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.paintsTabularDigits) private var tabularDigits
 
     var body: some View {
         let family = theme.fontFamilies[style.role == "heading" ? "heading" : "body"]
         var base = styledRun(text, style: style, family: family, italic: italic, rightToLeft: layoutDirection == .rightToLeft, leadsParagraph: true)
+        if tabularDigits { base = base.monospacedDigit() }
         if decoration == "underline" { base = base.underline() }
         if decoration == "lineThrough" { base = base.strikethrough() }
         return

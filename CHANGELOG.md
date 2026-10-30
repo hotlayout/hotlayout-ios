@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- **A number that counts no longer moves the layout.** While a text or a scale label runs a
+  transition (`animateChanges`) or an appearance (`animateIn`), the node is measured with the
+  final text: its size, line breaks and height are those of the final number, and they change
+  once, when the data change or the node is shown, never on a frame of the motion. The number in
+  between is only painted over the place of the final text, from the same start (the start of
+  the line in right-to-left), with figures of equal width; a longer number in between may
+  overflow the box for the frames of the motion. When the motion ends the final text stands in
+  its own place and the box does not move. A new value during a transition holds the place by the
+  new final value. A screen reader hears the final text; the painted layer is hidden from it.
+  The label under a progress bar does the same; the track, the ring and the ring label do not
+  depend on the shown value.
+- The shared case tables are brought up to the contract: `layoutCases` of the value transition
+  table and a new row of the carousel width table (a card as wide as the screen with the zero
+  spacing step everywhere).
+
 ## 0.4.0 - 2026-10-29
 
 Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0) and placement map **1.1.0**. Folds in the entries that were prepared as 0.5.0 to 0.7.2 and never published (the last release is 0.3.0).

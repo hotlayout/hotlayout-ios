@@ -76,7 +76,7 @@ final class CarouselCasesTests: XCTestCase {
 
     func testCardWidth() {
         let rows = Contract.rows(Self.table, "cardCases")
-        XCTAssertEqual(rows.count, 17)
+        XCTAssertEqual(rows.count, 18)
         for row in rows {
             let name = row["name"]?.stringValue ?? "?"
             let peek = CarouselRules.peekPixels(row["peek"].flatMap { $0.isNull ? nil : $0 }, spacing: { spacing[$0] })

@@ -23,6 +23,7 @@ is listed by name where Apple's CLDR data writes other characters than the table
 - `repeater-filter`: `filterCases`, `limitCases`, `emptinessCases`, `carouselCases`
 - `long-press`, `press-feedback`, `swipe-confirm`, `shadow-color`, `border-dash`: every group but the validator's (`documentCases`, `schemaCases`); `composition`: `pressableCases`, `pressCases`, `nameCases`; `motion`: `poseCases`, `documentCases`; `bottom-zone`: the three `navBadge…Motion…` groups
 - `carousel`: all eight groups
+- `value-transition`: `layoutCases` (the place of the final value, the value painted over it)
 - `inputs`: all groups for a reader except the validator's (`ruleCases`, `formRuleCases`, `emptinessDocumentCases`, `placementCases`) and the parts of a text field (`fieldBoxCases`, `affixRowCases`, `counterCases`, `noteRowCases`, `partsDocumentCases`); `actions`: `writeCases`, `writeControlCases`, `writePressCases`, `hapticCases`
 
 - `media-chrome`, pictures: `ratioCases`, `imageBoxCases` (also through the real node), `paintCases`, `radiusCases`, `circleCases`

@@ -143,10 +143,16 @@ struct TextRichWidget: View {
     /// lead (`animateChanges`, `animateIn`). Both stand aside from a text without them.
     var body: some View {
         CountdownTicking(node: node, context: context) { ticked in
+            // The node is measured with the final numbers; the number in between is painted over
+            // the place of the final text.
             ValueTransitioned(node: node, context: ticked) { shown in
                 var shownContext = ticked
                 shownContext.scope = shown.stepped
-                return TextRichContent(node: node, context: shownContext, position: position)
+                return HeldPlace(held: shown.held) {
+                    TextRichContent(node: node, context: ticked, position: position)
+                } painted: {
+                    TextRichContent(node: node, context: shownContext, position: position)
+                }
             }
         }
     }
@@ -225,6 +231,7 @@ struct RichParagraph: View {
     let maxLines: Int?
     let rightToLeft: Bool
     var wraps = true
+    @Environment(\.paintsTabularDigits) private var tabularDigits
 
     private enum Layer { case plain, gradientMask, gradientOwn }
 
@@ -267,7 +274,8 @@ struct RichParagraph: View {
     }
 
     private func text(_ layer: Layer) -> some View {
-        let joined = plan.runs.enumerated().map { segment($1, layer, first: $0 == 0) }.reduce(Text("")) { $0 + $1 }
+        var joined = plan.runs.enumerated().map { segment($1, layer, first: $0 == 0) }.reduce(Text("")) { $0 + $1 }
+        if tabularDigits { joined = joined.monospacedDigit() }
         return
             joined
             .lineBoxed(plan.lineBlock, natural: plan.naturalBlock)

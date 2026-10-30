@@ -18,12 +18,13 @@ final class TextTransitionWiringTests: XCTestCase {
         try textNode(["kind": "binding", "path": "p", "fallback": "0", "format": "number"], extra: extra)
     }
 
-    private func picture(_ node: DocumentNode, scope: DataScope, now: Double = 1_791_000_000_000, elapsedMs: Double? = nil, ticked: Double? = nil, engine: ValueTransitionEngine? = nil) -> ProgressPixels.Image {
+    private func picture(_ node: DocumentNode, scope: DataScope, now: Double = 1_791_000_000_000, elapsedMs: Double? = nil, ticked: Double? = nil, engine: ValueTransitionEngine? = nil, tabular: Bool = false) -> ProgressPixels.Image {
         var context = Body.context(scope: scope)
         context.now = now
         let view = TextRichWidget(node: node, context: context, position: nil)
             .environment(\.valueTransitionElapsedMs, elapsedMs)
             .environment(\.countdownTickedSeconds, ticked)
+            .environment(\.paintsTabularDigits, tabular)
             .frame(width: 240, alignment: .leading).padding(10).background(Color.white)
         return ProgressPixels.render(view)
     }
@@ -36,8 +37,9 @@ final class TextTransitionWiringTests: XCTestCase {
         let node = try points([("animateIn", true)])
         let plain = try points()
         // 175 ms of 700: e = 0.578125, 80 × e = 46.25, whole steps cut towards zero: 46.
-        XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 0), picture(plain, scope: ["p": 0])), "the first frame shows zero")
-        XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 175), picture(plain, scope: ["p": 46])), "mid-transition the node shows an intermediate number")
+        // The number in between is painted with figures of equal width.
+        XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 0), picture(plain, scope: ["p": 0], tabular: true)), "the first frame shows zero")
+        XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 175), picture(plain, scope: ["p": 46], tabular: true)), "mid-transition the node shows an intermediate number")
         XCTAssertFalse(same(picture(node, scope: ["p": 80], elapsedMs: 175), picture(plain, scope: ["p": 80])))
         XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 700), picture(plain, scope: ["p": 80])), "at the end the final number")
     }

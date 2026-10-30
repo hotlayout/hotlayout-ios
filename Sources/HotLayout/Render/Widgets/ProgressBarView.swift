@@ -65,7 +65,12 @@ struct ProgressBarContent: View {
             currentColor: ProgressRules.currentColor(props, resolver: resolver),
             units: units, glow: ProgressRules.Glow(props["glow"])
         )
-        let label = ProgressRules.labelText(format: props["labelFormat"]?.stringValue ?? "valueOfMax", value: steppedValue, max: steppedMax, ratio: ratio)
+        let format = props["labelFormat"]?.stringValue ?? "valueOfMax"
+        let label = ProgressRules.labelText(format: format, value: steppedValue, max: steppedMax, ratio: ratio)
+        // The label under the bar takes the place of the FINAL label while the value runs.
+        let finalLabel = ProgressRules.labelText(
+            format: format, value: ProgressRules.number(props["value"], scope: context.scope) ?? 0,
+            max: ProgressRules.number(props["max"], scope: context.scope) ?? 100, ratio: targetRatio)
         let gap = theme.coreSpacing(ProgressRules.barLabelGap)
 
         VStack(alignment: .leading, spacing: gap) {
@@ -79,13 +84,16 @@ struct ProgressBarContent: View {
             if let label {
                 let style = theme.coreTypography(ProgressRules.defaultLabelTypography)
                 let color = theme.coreColor(ProgressRules.barLabelColor)
-                Text(label)
-                    .font(style.font(family: theme.fontFamilies["body"]))
-                    .monospacedDigit()
-                    .foregroundColor(color.color)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                let line = { (text: String) in
+                    Text(text)
+                        .font(style.font(family: theme.fontFamilies["body"]))
+                        .monospacedDigit()
+                        .foregroundColor(color.color)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                HeldPlace(held: shown.held) { line(finalLabel ?? label) } painted: { line(label) }
             }
         }
     }
