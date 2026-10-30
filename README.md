@@ -1,9 +1,20 @@
-# HotLayout for iOS
+# HotLayout for iOS — `HotLayout`
 
 A Swift package that draws server-driven UI (SDUI) screens published by the
 [HotLayout](https://hotlayout.com) builder: a JSON document, a theme and your data become a native SwiftUI screen.
 
-**Quickstart:** [docs](https://hotlayout.com/docs/integrator/quickstart-ios) · [video](https://youtu.be/Qrbz3ztlfDQ) · **Builder and access:** [hotlayout.com](https://hotlayout.com)
+**Quickstart:** [docs](https://hotlayout.com/docs/integrator/quickstart-ios) · [video](https://youtu.be/Qrbz3ztlfDQ) · **Builder and access:** [hotlayout.com](https://hotlayout.com) · [try the editor](https://hotlayout.com/try)
+
+[![SPM](https://img.shields.io/github/v/tag/hotlayout/hotlayout-ios?label=SPM&color=0a6cc9)](https://github.com/hotlayout/hotlayout-ios)
+[![License](https://img.shields.io/badge/license-Apache--2.0-0a6cc9)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-hotlayout.com-0a6cc9)](https://hotlayout.com/docs)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/hotlayout/.github/main/profile/assets/app-obsidian.png" alt="A rewards screen built in HotLayout, dark theme" width="240">
+  &nbsp;&nbsp;
+  <img src="https://raw.githubusercontent.com/hotlayout/.github/main/profile/assets/app-sunny.png" alt="The same kind of screen with another theme, light and playful" width="240">
+</p>
+<p align="center"><sub>Two screens built in HotLayout. Try the editor in your browser, no sign-up: <a href="https://hotlayout.com/try">https://hotlayout.com/try</a></sub></p>
 
 It reads the same contract as the React and Flutter readers (document schema **9.33.0**, theme
 **4.0.1**, icon set **1.0.0**) and is measured by the same shared case tables. All 28 widgets of
