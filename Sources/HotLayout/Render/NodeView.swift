@@ -44,7 +44,8 @@ struct NodeView: View {
         let shaped = boxLook(look, carousel: carousel)
         let box = widget(inner, style: style, space: hostSpace(look), carouselPadding: carousel ? look.padding : nil)
             .modifier(WriteControlTraits(node: node, context: inner))
-            .modifier(NodeBoxModifier(look: shaped.withoutMargin, placement: placementWithMainAxis, context: inner))
+            .modifier(
+                NodeBoxModifier(look: shaped.withoutMargin, placement: placementWithMainAxis, context: inner, contentEscapes: glowEscapesBox))
         // The press target is the box of the node without its margin; the motion moves that box.
         pressable(box, inner)
             .nodeMotion(motionOutside || node.widget == .screen ? nil : NodeMotion.read(node.fields["motion"]), rightToLeft: context.rightToLeft)
@@ -57,6 +58,11 @@ struct NodeView: View {
         let style = NodeStyle.effective(node, scope: context.scope)
         guard node.widget == .appBar, context.barScrolled else { return style }
         return AppBarRules.withScrolledLayer(style, scrolled: AppBarRules.scrolledStyle(node), resolver: context.resolver)
+    }
+
+    /// A scale with a `glow` (a bar or a ring) is not clipped by the box of its own node.
+    private var glowEscapesBox: Bool {
+        (node.widget == .progressBar || node.widget == .circularProgress) && ProgressRules.Glow(node.props["glow"]) != nil
     }
 
     /// A ring stands in the centre of its box; every other node keeps the placement it was given.

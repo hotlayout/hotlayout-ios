@@ -75,6 +75,9 @@ struct NodeBoxModifier: ViewModifier {
     let givenLook: BoxLook
     let placement: Placement
     let context: RenderContext
+    /// A scale that glows is not clipped by its own box: the glow lies outside the scale by its blur, and
+    /// only an ancestor that clips may cut it, as it cuts a shadow. The radius still rounds the background.
+    var contentEscapes = false
 
     /// A layer on the whole stack takes the size of the stack: its own sizes do not apply
     /// (`x-style.fillOverridesSize`).
@@ -97,10 +100,11 @@ struct NodeBoxModifier: ViewModifier {
         return copy
     }
 
-    init(look: BoxLook, placement: Placement, context: RenderContext) {
+    init(look: BoxLook, placement: Placement, context: RenderContext, contentEscapes: Bool = false) {
         self.givenLook = look
         self.placement = placement
         self.context = context
+        self.contentEscapes = contentEscapes
     }
 
     func body(content: Content) -> some View {
@@ -126,7 +130,7 @@ struct NodeBoxModifier: ViewModifier {
                     clampsToParent: placement.clampsWidth)
             )
             .frame(minHeight: look.minHeight.map { CGFloat($0) }, maxHeight: look.maxHeight.map { CGFloat($0) }, alignment: placement.contentAlignment)
-        let clipsContent = !look.surfaceDrawnByWidget && (rounded || look.width != nil || look.height != nil)
+        let clipsContent = !look.surfaceDrawnByWidget && !contentEscapes && (rounded || look.width != nil || look.height != nil)
         return
             inner
             // The content is clipped by the inner edge of the border (the padding box, as in CSS): the
