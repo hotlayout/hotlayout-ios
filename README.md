@@ -5,7 +5,7 @@ A Swift package that draws server-driven UI (SDUI) screens published by the
 
 **Quickstart:** [docs](https://hotlayout.com/docs/integrator/quickstart-ios) · [video](https://youtu.be/Qrbz3ztlfDQ) · **Builder and access:** [hotlayout.com](https://hotlayout.com)
 
-It reads the same contract as the React and Flutter readers (document schema **9.33.0**, theme
+It reads the same contract as the React and Flutter readers (document schema **9.34.0**, theme
 **4.0.1**, icon set **1.0.0**) and is measured by the same shared case tables. All 28 widgets of
 the contract are drawn.
 
@@ -117,6 +117,15 @@ struct CheckoutScreen: View {
     }
 }
 ```
+
+A swipe button with `confirmTransition: 'ripple'` that leads to another screen fills the screen with its
+colour before the screen changes. By default the fill lies over the view of `HotlayoutScreen` and the
+reader changes its own screens under it. If your app keeps its own stack of screens (you cancel the
+change with `onNavigate` and show your own view), pass `onScreenCovered`: the fill then lies in a layer
+over the whole window, above your views, so it outlives the screen the button was on. The handler gets
+`true` when a fill starts to cover the screen, before the action reaches `onNavigate` or `onAction`
+(change your screen then, without a transition of your own), and `false` once the last fill is gone.
+With no window to draw in there is no fill and the action runs at once.
 
 The module is called `HotLayout` and its types `Hotlayout…`, on purpose: the names match the other readers
 of the contract. The global functions `loadDocument`, `loadTheme`, `checkVersion`,

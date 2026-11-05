@@ -100,9 +100,10 @@ final class HostWiringTests: XCTestCase {
         _ = press(swipe)
         spin(0.3)
         XCTAssertEqual(recorder.log, ["action redeem"])
-        // The handler returns: the thumb comes back at once, long before the eight seconds.
+        // The handler returns: the circle expands back (600 ms) and the thumb returns (250 ms), long before
+        // the eight seconds.
         release?.resume()
-        spin(0.4)
+        spin(1.1)
         XCTAssertEqual(recorder.log, ["action redeem", "done"])
         XCTAssertTrue(press(try XCTUnwrap(find(view, label: "Swipe to pay"))))
         spin(0.3)

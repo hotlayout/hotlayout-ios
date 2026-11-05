@@ -95,6 +95,19 @@ enum SwipeConfirmRules {
         return ActionType(type) == ActionType.none || type == nil ? .none : .reader
     }
 
+    /// Who WILL run an action, judged on the action as handed over, before it runs: `none` and an invalid
+    /// standard action do nothing; navigation and the write actions are the reader's; the rest is the host's.
+    /// It decides whether the fill plays, and the fill must start before the action does.
+    static func intendedRunner(of action: HotlayoutAction) -> Runner {
+        let type = ActionType(action.type)
+        if type == ActionType.none || action.type.isEmpty { return .none }
+        if action.invalid != nil { return .invalid }
+        switch type {
+        case .navigate?, .navigateBack?, .navigateSection?, .setValue?, .toggleValue?: return .reader
+        default: return .host
+        }
+    }
+
     static func afterRelease(_ runner: Runner) -> AfterRelease {
         runner == .none || runner == .invalid ? .giveBack : .busy
     }

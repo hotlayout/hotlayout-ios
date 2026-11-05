@@ -23,9 +23,18 @@ struct SwipeConfirmLook {
 }
 
 /// `Button.confirm: 'swipe'`: a track with a thumb that is dragged along the line. A press
-/// without a drag does nothing; the keyboard and assistive technology act at once. After the
-/// action the thumb glides to the end and stays BUSY until the screen changes, the host's `async`
-/// `onAction` returns, or eight seconds pass when the host's handler is not `async`.
+/// without a drag does nothing; the keyboard and assistive technology act at once.
+///
+/// While the thumb is dragged a fill of the thumb's colour follows it and the label fades with the
+/// travel. Released past the threshold the action runs at once, the thumb glides to the end and the
+/// button collapses into a circle holding the busy indicator: that circle is the look of BUSY, and it
+/// lasts until the screen changes, the host's `async` `onAction` returns, or eight seconds pass when
+/// the host's handler is not `async`. The circle then expands back and the thumb returns.
+///
+/// With `confirmTransition: 'ripple'`, after a swipe on a `navigate` or `navigate.back` action the
+/// circle grows over the whole screen and only then does the action run, under the fill
+/// (`SwipeRippleStore`). The keyboard, assistive technology and «reduce motion» skip the circle and
+/// the fill.
 struct SwipeConfirmButton: View {
     let node: DocumentNode
     let context: RenderContext
@@ -34,15 +43,32 @@ struct SwipeConfirmButton: View {
     /// Fixed state for the tests and the frames of the fixtures (the thumb at this progress).
     var fixedProgress: Double?
     var fixedBusy = false
+    /// Fixed state: the collapse at this time in milliseconds (the circle is drawn from it).
+    var fixedCollapse: Double?
+
+    /// What the button is doing after a release.
+    enum Phase: Equatable { case idle, gliding, collapsing, busy, expanding, returning, rippling }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.swipeRipple) private var ripples
+    @Environment(\.swipeProbe) private var probe
     @State private var progress = 0.0
-    @State private var busy = false
+    @State private var phase = Phase.idle
+    /// The collapse in milliseconds, animated linearly.
+    @State private var collapse = 0.0
+    /// The circle stands where the thumb was.
+    @State private var circle = false
     @State private var dragging = false
     @State private var captured: Bool?
     @State private var busyToken = 0
     /// The host's `async` answer to the action of the busy state in progress.
     @State private var hostTask: Task<Void, Never>?
+    /// The timed steps of the motion: the glide, the collapse, the expansion.
+    @State private var stage: Task<Void, Never>?
+    @State private var endPending = false
+    @State private var ripplePending = false
+    @State private var fill: SwipeRippleHandle?
+    @State private var frame = FrameBox()
 
     private var action: JSONObject { node.props["action"]?.objectValue ?? ["type": .string(ActionType.none.rawValue)] }
 
@@ -54,14 +80,52 @@ struct SwipeConfirmButton: View {
         SwipeConfirmRules.Track(height: height, width: 0, border: look.borderWidth, inset: look.theme.coreSpacing(SwipeConfirmRules.insetToken))
     }
 
+    private var busy: Bool { phase != .idle && phase != .returning }
+
     var body: some View {
         let geometry = SwipeConfirmRules.geometry(track)
         let shown = fixedProgress ?? progress
         let isBusy = busy || fixedBusy
+        let showsCircle = circle || fixedCollapse != nil || (fixedBusy && !reduceMotion)
+        let elapsed = fixedCollapse ?? (fixedBusy && !circle ? SwipeMotion.collapseMs : collapse)
         label(room: geometry.thumbRoom)
+            .opacity(SwipeMotion.labelOpacity(shown))
             .frame(height: height)
             .frame(maxWidth: look.fullWidth ? .infinity : nil)
-            .background(look.shape.fill(look.trackFill?.color ?? .clear))
+            .background { surface.modifier(SwipeSurfaceFade(elapsed: showsCircle ? elapsed : 0)) }
+            .overlay { GeometryReader { proxy in layers(width: Double(proxy.size.width), progress: shown, busy: isBusy, circle: showsCircle, elapsed: elapsed) } }
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { frame.global = proxy.frame(in: .global) }
+                        .onChange(of: proxy.frame(in: .global)) { frame.global = $0 }
+                })
+            .contentShape(look.shape)
+            .opacity(disabled ? 0.5 : 1)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(look.label)
+            .accessibilityAddTraits(isBusy ? [.isButton, .updatesFrequently] : .isButton)
+            .accessibilityAction { complete(.keyboard) }
+            .modifier(SwipeKeyboard(act: { complete(.keyboard) }))
+            // Ends with the busy state it waits for, and with the button when its screen goes.
+            .task(id: busyToken) { await holdBusy() }
+            // A fill that has not covered the screen yet goes with the button and the action never runs.
+            .onDisappear {
+                stage?.cancel()
+                fill?.cancel()
+            }
+            .onAppear { probe?.buttons[node.id] = { way in complete(way) } }
+    }
+
+    private func label(room: Double) -> some View {
+        StyledText(text: look.label, style: look.typography, color: look.labelColor, theme: look.theme, alignment: .center)
+            .padding(.horizontal, CGFloat(room))
+            .frame(maxWidth: .infinity)
+    }
+
+    /// The background, the border and the shadow of the track.
+    private var surface: some View {
+        look.shape.fill(look.trackFill?.color ?? .clear)
             .overlay {
                 if look.borderWidth > 0, let color = look.borderColor {
                     if look.dashedBorder {
@@ -71,51 +135,61 @@ struct SwipeConfirmButton: View {
                     }
                 }
             }
-            .overlay { GeometryReader { proxy in thumb(width: Double(proxy.size.width), progress: shown, busy: isBusy) } }
             .shadowLayers(look.shadow, shape: look.shape)
-            .contentShape(look.shape)
-            .opacity(disabled ? 0.5 : 1)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(look.label)
-            .accessibilityAddTraits(isBusy ? [.isButton, .updatesFrequently] : .isButton)
-            .accessibilityAction { complete() }
-            .modifier(SwipeKeyboard(act: { complete() }))
-            // Ends with the busy state it waits for, and with the button when its screen goes.
-            .task(id: busyToken) { await holdBusy() }
-    }
-
-    private func label(room: Double) -> some View {
-        StyledText(text: look.label, style: look.typography, color: look.labelColor, theme: look.theme, alignment: .center)
-            .padding(.horizontal, CGFloat(room))
-            .frame(maxWidth: .infinity)
     }
 
     // MARK: Thumb
 
-    private func thumb(width: Double, progress: Double, busy: Bool) -> some View {
+    private func layers(width: Double, progress: Double, busy: Bool, circle: Bool, elapsed: Double) -> some View {
         let t = SwipeConfirmRules.Track(height: height, width: width, border: look.borderWidth, inset: track.inset)
-        let diameter = CGFloat(SwipeConfirmRules.geometry(t).diameter)
-        let start = SwipeConfirmRules.thumbStart(t, progress: progress)
-        // SwiftUI mirrors an offset in a right-to-left environment: `start` is from the inline start.
-        return ZStack {
-            Circle().fill(look.thumbFill.color)
-            if busy {
-                SwipeSpinner(size: look.typography.fontSize, color: look.glyphColor.color, still: reduceMotion)
+        return ZStack(alignment: .topLeading) {
+            if circle {
+                SwipeCircleLayer(
+                    elapsed: elapsed, track: t, color: look.thumbFill.color, glyphColor: look.glyphColor.color, glyphSize: look.typography.fontSize,
+                    still: reduceMotion)
             } else {
-                IconGlyph(
-                    name: look.icon ?? SwipeConfirmRules.thumbGlyph, glyph: look.typography.fontSize,
-                    box: CGSize(width: look.typography.fontSize, height: look.typography.fontSize), color: look.glyphColor.color,
-                    rightToLeft: context.rightToLeft)
+                thumbAndTrail(t, progress: progress, busy: busy)
             }
         }
-        .frame(width: diameter, height: diameter)
-        .offset(x: CGFloat(start), y: CGFloat((height - Double(diameter)) / 2))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .animation(circle ? .linear(duration: SwipeMotion.collapseMs / 1000) : nil, value: elapsed)
+    }
+
+    /// The fill behind the thumb and the thumb: both have the radius of the thumb, concentric with the track.
+    private func thumbAndTrail(_ t: SwipeConfirmRules.Track, progress: Double, busy: Bool) -> some View {
+        let diameter = CGFloat(SwipeConfirmRules.geometry(t).diameter)
+        let start = SwipeConfirmRules.thumbStart(t, progress: progress)
+        let strip = SwipeMotion.trail(t, progress: progress)
+        let corner = CGFloat(SwipeMotion.thumbRadius(t, radius: look.corners.topStart))
+        let top = CGFloat(max(0, t.border) + max(0, t.inset))
+        // Placed from the inline start with a leading padding: it mirrors in right-to-left text.
+        return ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: corner)
+                .fill(look.thumbFill.color)
+                .frame(width: CGFloat(strip.width), height: diameter)
+                .padding(.leading, CGFloat(strip.start))
+                .padding(.top, top)
+            ZStack {
+                RoundedRectangle(cornerRadius: corner).fill(look.thumbFill.color)
+                if busy {
+                    SwipeSpinner(size: look.typography.fontSize, color: look.glyphColor.color, still: reduceMotion)
+                } else {
+                    IconGlyph(
+                        name: look.icon ?? SwipeConfirmRules.thumbGlyph, glyph: look.typography.fontSize,
+                        box: CGSize(width: look.typography.fontSize, height: look.typography.fontSize), color: look.glyphColor.color,
+                        rightToLeft: context.rightToLeft)
+                }
+            }
+            .frame(width: diameter, height: diameter)
+            .padding(.leading, CGFloat(start))
+            .padding(.top, top)
+            .gesture(drag(travel: SwipeConfirmRules.geometry(t).travel))
+        }
         .animation(
             dragging || reduceMotion
                 ? nil : .timingCurve(0.215, 0.61, 0.355, 1, duration: (busy ? SwipeConfirmRules.completeMs : SwipeConfirmRules.returnMs) / 1000),
             value: progress
         )
-        .gesture(drag(travel: SwipeConfirmRules.geometry(t).travel))
     }
 
     private func drag(travel: Double) -> some Gesture {
@@ -139,7 +213,7 @@ struct SwipeConfirmButton: View {
                     return
                 }
                 if SwipeConfirmRules.release(progress: progress, disabled: disabled) == .act {
-                    complete()
+                    complete(.swipe)
                 } else {
                     progress = 0
                 }
@@ -148,25 +222,112 @@ struct SwipeConfirmButton: View {
 
     // MARK: Acting and the busy state
 
-    /// The action runs at once; then the thumb stays at the end busy, or returns.
-    private func complete() {
+    /// Runs the action; the thumb then goes to the end and waits, or returns. After a swipe that asks for
+    /// the fill the action waits for it instead (`SwipeMotion.sequence`).
+    private func complete(_ way: SwipeMotion.Way) {
         guard !disabled, !busy else { return }
+        if playsRipple(way) {
+            beginRipple()
+            return
+        }
         let run = context.run(action, node)
         guard SwipeConfirmRules.afterRelease(run.runner) == .busy else {
             progress = 0
             return
         }
         dragging = false
-        busy = true
+        endPending = false
+        phase = .gliding
         progress = 1
         hostTask = run.task
         busyToken += 1
+        glideThenCollapse()
+    }
+
+    private func playsRipple(_ way: SwipeMotion.Way) -> Bool {
+        guard SwipeMotion.readsRipple(node.props), ripples != nil else { return false }
+        let type = action["type"]?.stringValue ?? ActionType.none.rawValue
+        let handed = ActionCatalog.handed(action, scope: context.scope)
+        return SwipeMotion.sequence(
+            runner: SwipeConfirmRules.intendedRunner(of: handed), actionType: type, ripple: true, way: way, reducedMotion: reduceMotion
+        ).contains(.ripple)
+    }
+
+    /// The thumb goes to the end, the button collapses into a circle, and the circle grows over the screen.
+    private func beginRipple() {
+        dragging = false
+        endPending = false
+        ripplePending = true
+        phase = .gliding
+        progress = 1
+        glideThenCollapse()
+    }
+
+    /// The thumb reaches the end (200 ms), then the button collapses into a circle (600 ms). Under «reduce
+    /// motion» the thumb jumps and waits at the end busy.
+    private func glideThenCollapse() {
+        stage?.cancel()
+        stage = Task { @MainActor in
+            if !reduceMotion {
+                try? await Task.sleep(nanoseconds: UInt64(SwipeConfirmRules.completeMs * 1_000_000))
+                guard !Task.isCancelled else { return }
+                circle = true
+                phase = .collapsing
+                collapse = 0
+                withAnimation(.linear(duration: SwipeMotion.collapseMs / 1000)) { collapse = SwipeMotion.collapseMs }
+                try? await Task.sleep(nanoseconds: UInt64(SwipeMotion.collapseMs * 1_000_000))
+                guard !Task.isCancelled else { return }
+            }
+            if ripplePending {
+                ripplePending = false
+                launchRipple()
+            } else {
+                phase = .busy
+                if endPending {
+                    endPending = false
+                    giveBack()
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func launchRipple() {
+        let global = frame.global
+        guard let ripples, global.width > 0 else {
+            covered()
+            return
+        }
+        let ring = SwipeMotion.collapse(SwipeConfirmRules.Track(height: height, width: Double(global.width), border: look.borderWidth, inset: track.inset), elapsed: 0).ring
+        let spec = SwipeRippleSpec(
+            center: CGPoint(x: global.midX, y: global.midY), halo: Double(global.height), core: max(0, Double(global.height) - 2 * ring),
+            color: look.thumbFill.color, indicatorColor: look.glyphColor.color, indicatorSize: look.typography.fontSize,
+            onCovered: { covered() })
+        guard let handle = ripples.start(spec) else {
+            covered()
+            return
+        }
+        fill = handle
+        phase = .rippling
+    }
+
+    /// The screen is covered: the action runs now, with its `track`, once. The button usually leaves with the
+    /// screen; one that stays is at rest again under the fading fill.
+    private func covered() {
+        _ = context.run(action, node)
+        fill = nil
+        circle = false
+        collapse = 0
+        phase = .idle
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { progress = 0 }
     }
 
     /// Waits for what ends the busy state: the host's task when it gave one, else the longest wait.
     @MainActor
     private func holdBusy() async {
-        guard busy else { return }
+        guard busy, phase != .rippling else { return }
         let token = busyToken
         if let task = hostTask {
             await task.value
@@ -179,49 +340,64 @@ struct SwipeConfirmButton: View {
         }
     }
 
-    /// An event of the busy state; the thumb returns when the rule says so. The screen changing is
-    /// the button leaving with its screen.
+    /// An event of the busy state; the circle expands and the thumb returns when the rule says so. The
+    /// screen changing is the button leaving with its screen.
     private func end(_ token: Int, on event: SwipeConfirmRules.BusyEvent, promise: Bool) {
         guard token == busyToken, busy, SwipeConfirmRules.busyOutcome(event, promise: promise) == .giveBack else { return }
-        busy = false
         hostTask = nil
-        progress = 0
+        switch phase {
+        case .gliding, .collapsing: endPending = true
+        case .busy: giveBack()
+        default: break
+        }
+    }
+
+    /// «Busy» is over: the circle expands back (a thumb that never collapsed has nothing to expand), then the
+    /// thumb returns to the start and the button acts again.
+    private func giveBack() {
+        stage?.cancel()
+        guard circle, !reduceMotion else {
+            circle = false
+            collapse = 0
+            phase = .returning
+            progress = 0
+            return
+        }
+        phase = .expanding
+        withAnimation(.linear(duration: SwipeMotion.collapseMs / 1000)) { collapse = 0 }
+        stage = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(SwipeMotion.collapseMs * 1_000_000))
+            guard !Task.isCancelled else { return }
+            circle = false
+            phase = .returning
+            progress = 0
+        }
     }
 }
 
-/// A ring of three quarters, turning once in 800 ms. It turns only while it is on the screen and the
-/// person has not asked to reduce motion: otherwise it is drawn still, with no timeline at all (a
-/// running timeline keeps automation, and the display, from ever seeing the app idle).
-private struct SwipeSpinner: View {
-    let size: Double
-    let color: Color
-    let still: Bool
+/// Lets a test let go of the thumb of the button below it, as a finger would (a synthesized mouse drag does
+/// not reach the gesture of a view hosted off screen).
+final class SwipeProbe {
+    /// The way to let go of the button, by the id of its node.
+    var buttons: [String: (SwipeMotion.Way) -> Void] = [:]
 
-    @State private var onScreen = false
+    func release(_ id: String, _ way: SwipeMotion.Way) { buttons[id]?(way) }
+}
 
-    var body: some View {
-        Group {
-            if still || !onScreen {
-                ring(turn: 0)
-            } else {
-                TimelineView(.animation) { timeline in
-                    ring(
-                        turn: (timeline.date.timeIntervalSinceReferenceDate * 1000).truncatingRemainder(dividingBy: SwipeConfirmRules.spinnerTurnMs)
-                            / SwipeConfirmRules.spinnerTurnMs)
-                }
-            }
-        }
-        .onAppear { onScreen = true }
-        .onDisappear { onScreen = false }
+private struct SwipeProbeKey: EnvironmentKey {
+    static let defaultValue: SwipeProbe? = nil
+}
+
+extension EnvironmentValues {
+    var swipeProbe: SwipeProbe? {
+        get { self[SwipeProbeKey.self] }
+        set { self[SwipeProbeKey.self] = newValue }
     }
+}
 
-    private func ring(turn: Double) -> some View {
-        Circle()
-            .trim(from: 0, to: 0.75)
-            .stroke(color, style: StrokeStyle(lineWidth: CGFloat(size / 8), lineCap: .butt))
-            .frame(width: CGFloat(size - size / 8), height: CGFloat(size - size / 8))
-            .rotationEffect(.degrees(turn * 360))
-    }
+/// The frame of the button in global coordinates, kept as the layout reports it.
+private final class FrameBox {
+    var global = CGRect.zero
 }
 
 /// Enter and Space act at once; a held key repeats nothing.

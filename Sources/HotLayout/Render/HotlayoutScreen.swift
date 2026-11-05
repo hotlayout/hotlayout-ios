@@ -60,6 +60,7 @@ public struct HotlayoutScreen: View {
     let autofill: Bool
     let onScreenChange: ((ScreenShownEvent) -> Void)?
     let onReport: (([HotlayoutReport]) -> Void)?
+    let onScreenCovered: ((Bool) -> Void)?
 
     @State private var flow: Flow?
     @State private var session: DataScope = [:]
@@ -71,6 +72,8 @@ public struct HotlayoutScreen: View {
     @State private var reportsAdded = PassthroughSubject<Void, Never>()
     /// The screen-shown events after the first one, handed to the newest `onScreenChange`.
     @State private var screensShown = PassthroughSubject<ScreenShownEvent, Never>()
+    /// The fills of the swipe buttons that ask for `confirmTransition: 'ripple'`.
+    @State private var ripples = SwipeRippleStore(mount: SwipeRippleWindow.mount)
 
     /// - Parameters:
     ///   - document: a document from `HotlayoutDocument.load(_:)`.
@@ -98,6 +101,14 @@ public struct HotlayoutScreen: View {
     ///   - onScreenChange: the screen-shown event, once per show, the first one included.
     ///   - onReport: what the reader skipped or replaced in the document, the theme or while
     ///     drawing; each report is handed over once, as it appears.
+    ///   - onScreenCovered: for an app that keeps its own stack of screens. A swipe button with
+    ///     `confirmTransition: 'ripple'` fills the screen before it changes; with this handler the fill
+    ///     lies in a layer over the whole window, above your views, so it outlives the screen the button
+    ///     was on. It is told `true` when a fill starts to cover the screen, before the action reaches
+    ///     `onNavigate` or `onAction` (change your screen then, without a transition of your own), and
+    ///     `false` once the last fill is gone. Without it the fill lies over this view, and the reader
+    ///     changes its own screens under it. With no window to draw in there is no fill and the action
+    ///     runs at once.
     public init(
         document: HotlayoutDocument,
         theme: HotlayoutThemeSet = .builtIn,
@@ -117,7 +128,8 @@ public struct HotlayoutScreen: View {
         writablePaths: WritablePaths? = nil,
         autofill: Bool = true,
         onScreenChange: ((ScreenShownEvent) -> Void)? = nil,
-        onReport: (([HotlayoutReport]) -> Void)? = nil
+        onReport: (([HotlayoutReport]) -> Void)? = nil,
+        onScreenCovered: ((Bool) -> Void)? = nil
     ) {
         self.document = document
         self.themeSet = theme
@@ -138,6 +150,7 @@ public struct HotlayoutScreen: View {
         self.autofill = autofill
         self.onScreenChange = onScreenChange
         self.onReport = onReport
+        self.onScreenCovered = onScreenCovered
     }
 
     /// The same screen with an `async` `onAction`: a button that confirms by a swipe stays busy
@@ -161,12 +174,14 @@ public struct HotlayoutScreen: View {
         writablePaths: WritablePaths? = nil,
         autofill: Bool = true,
         onScreenChange: ((ScreenShownEvent) -> Void)? = nil,
-        onReport: (([HotlayoutReport]) -> Void)? = nil
+        onReport: (([HotlayoutReport]) -> Void)? = nil,
+        onScreenCovered: ((Bool) -> Void)? = nil
     ) {
         self.init(
             document: document, theme: theme, themeId: themeId, data: data, locale: locale, entry: entry, timeZone: timeZone, now: now,
             images: images, labels: labels, onTrack: onTrack, onHaptic: onHaptic, onNavigate: onNavigate, onWrite: onWrite,
-            writablePaths: writablePaths, autofill: autofill, onScreenChange: onScreenChange, onReport: onReport
+            writablePaths: writablePaths, autofill: autofill, onScreenChange: onScreenChange, onReport: onReport,
+            onScreenCovered: onScreenCovered
         )
         self.onAction = .awaited(onAction)
     }
@@ -243,6 +258,9 @@ public struct HotlayoutScreen: View {
         .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight)
         .environment(\.glassOnDarkTheme, themeSet.theme(themeId).appearance == .dark)
         .environment(\.countdownClockPinned, now != nil)
+        .environment(\.swipeRipple, SwipeRippleScope(store: ripples, report: onScreenCovered))
+        // Over everything the screen draws: the zones, the navigation bar, the modal layers.
+        .overlay { SwipeRippleLayers(store: ripples).ignoresSafeArea() }
         .onAppear {
             if self.flow == nil {
                 let started = Flow(document: FlowDocument(document), entry: entry)
@@ -437,7 +455,8 @@ public struct HotlayoutScreen: View {
             }
         )
         let task = PressDelivery.hand(outcome, source: source, onAction: { handOver($0, $1) })
-        if updated != before { show(updated, animated: true) }
+        // A fill that covers the screen is the motion: the screen changes under it with no motion of its own.
+        if updated != before { show(updated, animated: !ripples.covers) }
         if let shown = outcome.shown { screensShown.send(shown) }
         deliverReports()
         return PressRun(runner: SwipeConfirmRules.runner(type: action["type"]?.stringValue, outcome: outcome), task: task)
