@@ -198,7 +198,8 @@ final class SwipeRippleStoreTests: XCTestCase {
         waitFor { log.contains("acted") }
         handle?.cancel()
         XCTAssertTrue(store.covers, "the button left with its screen, the fill did not")
-        waitFor { !store.covers }
+        // The report of the end comes on the next turn of the main queue, after the fill is gone.
+        waitFor { log.count >= 3 }
         XCTAssertFalse(store.covers)
         XCTAssertEqual(log, ["covered true", "acted", "covered false"])
     }
