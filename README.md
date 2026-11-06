@@ -1,10 +1,10 @@
 # HotLayout for iOS — `HotLayout`
 
-A Swift package that draws server-driven UI (SDUI) screens published by the
-[HotLayout](https://hotlayout.com) builder: a JSON document, a theme and your data become a native SwiftUI screen.
+A Swift package that draws server-driven UI (SDUI) screens published by the [HotLayout](https://hotlayout.com) builder: a JSON document, a theme and your data become a native SwiftUI screen, so changing a screen needs no app release.
 
 **Quickstart:** [docs](https://hotlayout.com/docs/integrator/quickstart-ios) · [video](https://youtu.be/Qrbz3ztlfDQ) · **Builder and access:** [hotlayout.com](https://hotlayout.com) · [try the editor](https://hotlayout.com/try)
 
+[![CI](https://github.com/hotlayout/hotlayout-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/hotlayout/hotlayout-ios/actions/workflows/ci.yml)
 [![SPM](https://img.shields.io/github/v/tag/hotlayout/hotlayout-ios?label=SPM&color=0a6cc9)](https://github.com/hotlayout/hotlayout-ios)
 [![License](https://img.shields.io/badge/license-Apache--2.0-0a6cc9)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-hotlayout.com-0a6cc9)](https://hotlayout.com/docs)
@@ -16,9 +16,15 @@ A Swift package that draws server-driven UI (SDUI) screens published by the
 </p>
 <p align="center"><sub>Two screens built in HotLayout. Try the editor in your browser, no sign-up: <a href="https://hotlayout.com/try">https://hotlayout.com/try</a></sub></p>
 
-It reads the same contract as the React and Flutter readers (document schema **9.34.0**, theme
-**4.0.1**, icon set **1.0.0**) and is measured by the same shared case tables. All 28 widgets of
-the contract are drawn.
+## What you get
+
+- **One view.** `HotlayoutScreen` draws a document with its own stack of screens; it opens nothing itself and does not use your navigation.
+- **Three separate inputs.** The document (screens), the theme (token values) and your data (a dictionary) are loaded and replaced independently.
+- **Languages and right-to-left.** A document carries its translations; you pass the device locale, the reader picks the language, the formats and the direction.
+- **The document is untrusted input.** A piece of the wrong shape is skipped and reported (`onReport`), never a crash. Links and deep links reach your code checked.
+- **A version policy.** A newer minor of the document is still drawn; another major is reported as incompatible.
+- **Placements.** `HotlayoutPlacementView` draws whichever published document the admin put in a named place of your app, with no release.
+- **The same document everywhere.** The React, Flutter and Android readers draw the same JSON; all follow the open [contract](https://github.com/hotlayout/contract).
 
 ## Requirements
 
@@ -44,14 +50,11 @@ targets: [
 ]
 ```
 
-**In Xcode:**
+**In Xcode:** File > Add Package Dependencies..., paste `https://github.com/hotlayout/hotlayout-ios`, set the rule to Up to Next Major Version from `0.5.0`, add the `HotLayout` library to your app target, then `import HotLayout`.
 
-1. Choose File > Add Package Dependencies...
-2. Paste `https://github.com/hotlayout/hotlayout-ios` into the search field.
-3. Set the dependency rule to Up to Next Major Version, from `0.5.0`, and choose Add Package.
-4. Add the `HotLayout` library to your app target, then `import HotLayout`.
+## Quickstart
 
-## Use
+Load the document and the theme once, then draw them with `HotlayoutScreen` inside a view of your own app. The snippet is compiled by a test of this repository (`HotLayoutAPITests`), so it matches the public API.
 
 ```swift
 import HotLayout
@@ -106,212 +109,27 @@ struct RewardsScreen: View {
 }
 ```
 
-**Device language.** `Locale.current` gives the language of the device only if the app declares
-the languages it is localized for (the app's localizations in the Xcode project, or
-`CFBundleLocalizations` in `Info.plist`). Without that iOS reports English, and a document that has an
-Arabic translation stays English on an Arabic device. Declare the languages of your documents, or
-pass `Locale.preferredLanguages.first` as `locale`.
+Standard actions arrive at `onAction` already checked, and the reader opens nothing itself: you decide what a URL or a deep link does. `Locale.current` reports the device language only if the app declares its localizations; the [reference](https://hotlayout.com/docs/integrator/ios-reference) says how.
 
-An `onAction` may be `async`. A button that confirms by a swipe then stays busy until the
-handler returns (with a plain handler: until the screen changes, or eight seconds):
+## Versions
 
-```swift
-struct CheckoutScreen: View {
-    let document: HotlayoutDocument
-    let redeem: (String?) async -> Void
-
-    var body: some View {
-        // An `async` handler: a button that confirms by a swipe stays busy until it returns.
-        HotlayoutScreen(document: document, onAction: { action, source async in
-            if action.type == "redeem" { await redeem(source.record?["item.id"]?.stringValue) }
-        })
-    }
-}
-```
-
-A swipe button with `confirmTransition: 'ripple'` that leads to another screen fills the screen with its
-colour before the screen changes. By default the fill lies over the view of `HotlayoutScreen` and the
-reader changes its own screens under it. If your app keeps its own stack of screens (you cancel the
-change with `onNavigate` and show your own view), pass `onScreenCovered`: the fill then lies in a layer
-over the whole window, above your views, so it outlives the screen the button was on. The handler gets
-`true` when a fill starts to cover the screen, before the action reaches `onNavigate` or `onAction`
-(change your screen then, without a transition of your own), and `false` once the last fill is gone.
-With no window to draw in there is no fill and the action runs at once.
-
-The module is called `HotLayout` and its types `Hotlayout…`, on purpose: the names match the other readers
-of the contract. The global functions `loadDocument`, `loadTheme`, `checkVersion`,
-`checkDocumentVersion` and `resolveLocale` still work as deprecated forwards of the members below.
-
-The public API, besides the view:
-
-| | |
+| What | Version |
 |---|---|
-| `HotlayoutDocument.load(_:)`, `HotlayoutThemeSet.load(_:)` | read a document or a theme from `Data` or a parsed `JSONValue`; throw `HotlayoutLoadError` |
-| `HotlayoutVersions.checkDocument(_:)`, `HotlayoutVersions.check(_:readerVersion:)`, `HotlayoutVersions` | the version rule, without reading the whole document |
-| `LocaleResolution.resolve(_:available:source:)` | which translation, number format and direction a device locale gets |
-| `HotlayoutAction`, `StandardAction`, `StandardActions.url(for:allowedDeeplinkSchemes:)` | what reaches `onAction`, and a helper for the standard actions |
-| `TrackEvent`, `HapticFeedback`, `NavigationEvent`, `ScreenShownEvent`, `ActionSource` | what the other callbacks receive |
-| `ImagePolicy`, `WritablePaths`, `ScreenLabels` | decisions of the host: pictures, writable data paths, texts of the reader |
-| `HotlayoutReport` | what the reader skipped or replaced; never shown to the person |
+| Package | `0.5.0` |
+| Document contract (schema) | `9.34.0` |
+| Theme contract | `4.0.1` |
+| Built-in icon set | `1.0.0` |
 
-## Placements
+The major version must match; a newer minor is readable, and parts this package does not know degrade instead of failing. What changed in each package version is in [CHANGELOG.md](CHANGELOG.md).
 
-A *placement* is a named place of your app (`home.banner`). The app names the place in code;
-which published document stands there is decided in the admin, and changed without a release.
+## Documentation
 
-```swift
-struct HomeBanner: View {
-    let projectBase = URL(string: "https://storage.example.com/orgs/acme/projects/app")!
-
-    var body: some View {
-        // Draws what the admin put in the place `home.banner`, and nothing when it is empty.
-        HotlayoutPlacementView(
-            name: "home.banner",
-            projectBase: projectBase,
-            onPlacement: { placement in
-                if let report = placement.report { print("home.banner:", report, placement.mapStatus) }
-            }
-        )
-    }
-}
-
-/// Without a view: load the place, then draw the document yourself.
-func loadBanner(projectBase: URL) async -> HotlayoutDocument? {
-    let placement = await HotlayoutPlacement.load(name: "home.banner", projectBase: projectBase)
-    return placement.document  // `placement.entry` is the entry point to pass to `HotlayoutScreen`
-}
-```
-
-The reader asks `placements/published.json` under `projectBase` with its `ETag`, and the document
-of the place under `documents/{documentId}/published.json`. It keeps the last map and document it
-read, and falls back, in this order, on the last known map and then on `bundledMap` (the text of a
-copy shipped with the app, for a first start without a network). Nothing throws; a place that
-draws nothing says why in `placement.report`:
-
-| `report` | |
-|---|---|
-| `empty` | the place is declared and empty on purpose |
-| `unknown` | the map has no such place (or the project published no map) |
-| `unreadable` | the map, or this place's record, could not be read |
-| `documentMissing` / `documentUnreadable` | the document is gone (404) / could not be read |
-| `entryMissing` | the entry point is not in the document: it is drawn from its first screen |
-
-`placement.mapStatus` says why that map is in use: `fresh`, `offline` (the network was silent),
-`corrupt` (it answered with something that is not a map), `unsupported` (a map of another major
-version) or `notPublished` (404). A name is lowercase Latin letters and digits in dot-separated
-segments; a name of another form is `unknown` and no request is made for it. Use
-`HotlayoutPlacementView(name:projectBase:…content:)` to draw with a `HotlayoutScreen` of your own
-configuration, and `store:` (the last known map), `documents:` (the documents read, files in the caches directory
-by default) and `session:` to choose where the last known copies live and how the requests are
-made. Redirects are not followed and a request is given up after 20 seconds. The view loads the
-map once per name; it does not poll. `onPlacement` is called with the first state and again whenever
-`placement.event` (`status`, `report`, `mapStatus`, `documentId`, `entry`) changes.
-
-### Schedule
-
-A place may carry a schedule: promotions `{documentId, entry?, from, until}` shown over its
-permanent content while `from` (included) to `until` (excluded) lasts, in UTC. An item with
-`documentId: null` is a pause: the place is empty (`report == .empty`) for its window. After the last window the
-permanent content is back.
-
-The schedule is resolved by the clock of the device, without a network. The view sets a timer for
-the next edge of the schedule and, when it fires, resolves the place again: it does not ask for
-the map again, and only reads the document the new window brings. It also resolves again when the
-app returns to the foreground, because the clock may have been set. The change is an ordinary
-`onPlacement` event (`documentId`, `entry`, and `empty` to `document` and back); if the answer is
-the same, there is no event. `HotlayoutPlacement.load(…, clock:)` and
-`HotlayoutPlacementView(…, clock:)` take the clock (`@Sendable () -> Date`, the device clock by
-default), which is how you test a schedule; `HotlayoutPlacementMap` has `resolve(_:at:)` and
-`nextBoundary(_:after:)` to ask a map yourself.
-
-An empty place draws nothing, but the view stays in your layout, and so do the padding and the
-frame you put around it. Take your own out when the place is empty:
-
-```swift
-struct HomeBanner: View {
-    let projectBase: URL
-    @State private var empty = false
-
-    var body: some View {
-        HotlayoutPlacementView(
-            name: "home.banner",
-            projectBase: projectBase,
-            onPlacement: { placement in empty = placement.document == nil }
-        )
-        // The view stays mounted so that it can wake up on the next window.
-        .padding(.horizontal, empty ? 0 : 16)
-        .padding(.vertical, empty ? 0 : 8)
-    }
-}
-```
-
-## What the reader does and does not do
-
-- **Documents, themes and data are untrusted input.** A piece of the wrong shape is skipped and
-  reported (`onReport`), never a crash. A tree deeper than 32 levels is refused. See
-  [the security model](docs/security.md).
-- **Navigation** inside a document (`navigate`, `navigate.back`, `navigate.section`) is done by
-  the reader; `onNavigate` may cancel it. `openUrl`, `deeplink`, `close` and the actions of your app
-  go to `onAction`, checked against the forms of the contract. Writes (fields, `setValue`,
-  `toggleValue`) go to the session of the screen and to `onWrite`.
-- **Images** load only from an address of the form of an `openUrl` address (`https:` and a public
-  host name) by default. Pass an `ImagePolicy` to decide yourself (`resolve`; your answer is final,
-  except that `javascript:` and `vbscript:` are never a picture), to give URLs for the asset tokens
-  (`logo`, `banner`, `placeholder`), and to set `maxDownloadBytes` (10 MiB by default) and
-  `maxPixelSide` (4096: a larger picture is made smaller, not refused). A refused address makes no
-  request and goes to `onReport`.
-- **Lists** draw at most 2550 instances of list templates per screen, nested lists included; what
-  is beyond is not drawn and is reported once.
-- **Haptic feedback** is asked of the host (`onHaptic`); the reader never vibrates.
-- **Fonts** are the app's: the package ships none. A family the theme names that the device lacks
-  is drawn with the system font.
-
-Where Apple's platform differs from the other readers is listed in
-[the platform notes](docs/platform-notes.md).
-
-## The contract
-
-The contract is a set of JSON artifacts: `screen-schema.json` (the widgets, their fields and the
-rules of drawing in its `x-…` blocks), `theme.json`, `data-contract.json` and `icons.json`, with
-the shared case tables in `fixtures/`. Comments in this package name the `x-…` blocks they follow.
-
-`scripts/sync-contract.sh <path>` copies a checkout of the contract into the package: the
-artifacts and tables the tests read, the fixtures of the demo, the icon set and the built-in theme.
-The tests compare every copy the reader ships with the artifacts.
-
-## Run
-
-```sh
-swift test                                    # rules, tables and off-screen drawing on macOS
-
-# the same unit tests on iOS: boot a simulator without its window, then test the package scheme
-xcrun simctl boot <device-id>
-xcodebuild test -scheme HotLayout -destination 'platform=iOS Simulator,id=<device-id>'
-xcrun simctl shutdown <device-id>
-
-# the fixture viewer and its UI tests on a simulator
-cd Demo
-xcodebuild -project HotlayoutDemo.xcodeproj -scheme HotlayoutDemoUITests \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro Max' -derivedDataPath build test
-```
-
-The demo (`Demo/`) uses the public API only. Without launch arguments it opens on Obsidian, one of
-three showcase apps (Obsidian, Sunny and Orbit; their documents, themes and sample data are in
-`Demo/fixtures/apps/`), with a small menu to switch app or to open the fixture list. Their pictures
-are loaded from hotlayout.com: the demo resolves the site-relative addresses of the documents itself,
-the reader's own rule (https only) is not relaxed. `-app obsidian|sunny|orbit -screen <screenId>
--entry <name> -locale <tag>` opens one app on its own; `-fixtureList YES` lists every fixture of the
-contract, and `-fixture <name> -screen <screenId> -locale <tag>` opens one screen of it. What the tests check
-is described in [Tests/README.md](Tests/README.md).
-
-## Learn more
-
-- Website: [hotlayout.com](https://hotlayout.com)
-- Documentation: [hotlayout.com/docs](https://hotlayout.com/docs), including the [quickstart for this platform](https://hotlayout.com/docs/integrator/quickstart-ios)
-- Video quickstart: [YouTube](https://youtu.be/Qrbz3ztlfDQ)
+- **[Full reference](https://hotlayout.com/docs/integrator/ios-reference)**: every callback and parameter, async actions, images, placements and their schedule, what the reader does and does not do
+- [Quickstart for this platform](https://hotlayout.com/docs/integrator/quickstart-ios) and [all documentation](https://hotlayout.com/docs) · [Video quickstart](https://youtu.be/Qrbz3ztlfDQ)
+- [Security model](docs/security.md) · [Platform notes](docs/platform-notes.md) (where Apple's platform differs from the other readers)
+- [Contributing](CONTRIBUTING.md): building, testing, the demo app and the shared case tables
 - Getting the builder: screens are made in the HotLayout builder, hosted at hotlayout.com or self-hosted. To get access, use "Get access" on [hotlayout.com](https://hotlayout.com) or write to [contact@hotlayout.com](mailto:contact@hotlayout.com).
 
 ## License
 
-Apache License 2.0, see [LICENSE](LICENSE). The icon drawings include icons from Lucide (ISC);
-see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Apache License 2.0, see [LICENSE](LICENSE). The icon drawings include icons from Lucide (ISC); see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
