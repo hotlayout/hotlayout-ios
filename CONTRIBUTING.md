@@ -11,6 +11,11 @@ swift build
 swift test         # rules, shared case tables and off-screen drawing, on macOS
 ```
 
+A few tests time a motion (the fill of a swipe button, a press that sinks, a number that leads, a
+fade that leaves the layout). They skip themselves when the system asks to reduce motion, because the
+views then jump to the end state by design; GitHub's macOS runners have that setting on, so these
+tests run only on a machine that plays motion, such as a developer's Mac.
+
 The same unit tests run on an iOS simulator, which is the platform the library ships for. Boot
 one without its window and test the package scheme:
 

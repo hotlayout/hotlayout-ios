@@ -84,6 +84,7 @@ final class VisibilityFadeLayoutTests: XCTestCase {
     /// A hosted column, in a window off every screen and never ordered in.
     @MainActor
     func testAFadeLeavesTheLayoutWhenItEndsAndAnEntryWaitsOutOfIt() throws {
+        try skipUnderReducedMotion()
         let node = ScreenSim.node([
             "id": "p", "type": "Column", "props": ["gap": "md"],
             "children": [box("a", Self.green), box("b", Self.blue, fades: true)],

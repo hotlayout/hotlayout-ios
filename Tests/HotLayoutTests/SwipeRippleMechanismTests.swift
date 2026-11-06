@@ -50,6 +50,7 @@ final class SwipeRippleMechanismTests: XCTestCase {
     }
 
     func testTheActionWaitsForTheFillAndThenTheScreenChanges() throws {
+        try skipUnderReducedMotion()
         let log = Log()
         let (view, probe) = try show(log)
         probe.release("pay-swipe", .swipe)
@@ -75,6 +76,7 @@ final class SwipeRippleMechanismTests: XCTestCase {
     }
 
     func testAButtonThatLeavesBeforeTheCoverTakesTheFillWithIt() throws {
+        try skipUnderReducedMotion()
         let log = Log()
         let (view, probe) = try show(log)
         probe.release("pay-swipe", .swipe)
@@ -122,6 +124,7 @@ final class SwipeRippleMechanismTests: XCTestCase {
     }
 
     func testAHostThatKeepsItsStackHearsTheCoverAndTheFillLiesOverTheWindow() throws {
+        try skipUnderReducedMotion()
         let log = Log()
         let (view, probe) = try show(log, covered: { log.lines.append("covered \($0)") }, allowNavigation: false)
         let content = try XCTUnwrap(view.window?.contentView)

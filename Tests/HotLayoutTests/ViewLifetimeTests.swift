@@ -23,13 +23,6 @@ final class ViewLifetimeTests: XCTestCase {
         ImageStore.shared.reset()
     }
 
-    /// The motions these tests time are not made when the device asks to reduce motion.
-    private func skipUnderReducedMotion() throws {
-        #if canImport(UIKit)
-        if UIAccessibility.isReduceMotionEnabled { throw XCTSkip("the device asks to reduce motion") }
-        #endif
-    }
-
     private func start(_ handler: @escaping (LocalServer.Request) -> LocalServer.Response) throws -> LocalServer {
         let made = try LocalServer(handler: handler)
         server = made
