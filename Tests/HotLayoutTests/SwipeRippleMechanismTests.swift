@@ -182,7 +182,7 @@ final class SwipeRippleStoreTests: XCTestCase {
         var log: [String] = []
         let store = SwipeRippleStore()
         let handle = store.start(spec { log.append($0) }, report: { log.append("covered \($0)") })
-        spin(0.3)
+        spin(0.1)
         handle?.cancel()
         XCTAssertFalse(store.covers)
         spin(0.9)
@@ -193,10 +193,12 @@ final class SwipeRippleStoreTests: XCTestCase {
         var log: [String] = []
         let store = SwipeRippleStore()
         let handle = store.start(spec { log.append($0) }, report: { log.append("covered \($0)") })
-        spin(0.9)
+        // Cancels right after the action rather than after a fixed delay: a slow machine that overslept a fixed
+        // 0.9 s would cancel a fill that had already ended.
+        waitFor { log.contains("acted") }
         handle?.cancel()
         XCTAssertTrue(store.covers, "the button left with its screen, the fill did not")
-        spin(0.4)
+        waitFor { !store.covers }
         XCTAssertFalse(store.covers)
         XCTAssertEqual(log, ["covered true", "acted", "covered false"])
     }
