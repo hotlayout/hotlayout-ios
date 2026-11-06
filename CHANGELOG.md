@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 - 2026-11-06
+
+Reads document contract **9.34.0**.
 
 - **Builds with Xcode 16 again.** The exact line height of a text (`lineHeight`) exists only in the
   iOS 26 SDK, and 0.5.0 called it behind a runtime check alone, so an app built with Xcode 16 did not

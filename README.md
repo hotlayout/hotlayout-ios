@@ -41,7 +41,7 @@ HotLayout is installed with Swift Package Manager.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/hotlayout/hotlayout-ios", from: "0.5.0"),
+    .package(url: "https://github.com/hotlayout/hotlayout-ios", from: "0.5.1"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -50,7 +50,7 @@ targets: [
 ]
 ```
 
-**In Xcode:** File > Add Package Dependencies..., paste `https://github.com/hotlayout/hotlayout-ios`, set the rule to Up to Next Major Version from `0.5.0`, add the `HotLayout` library to your app target, then `import HotLayout`.
+**In Xcode:** File > Add Package Dependencies..., paste `https://github.com/hotlayout/hotlayout-ios`, set the rule to Up to Next Major Version from `0.5.1`, add the `HotLayout` library to your app target, then `import HotLayout`.
 
 ## Quickstart
 
@@ -115,7 +115,7 @@ Standard actions arrive at `onAction` already checked, and the reader opens noth
 
 | What | Version |
 |---|---|
-| Package | `0.5.0` |
+| Package | `0.5.1` |
 | Document contract (schema) | `9.34.0` |
 | Theme contract | `4.0.1` |
 | Built-in icon set | `1.0.0` |
