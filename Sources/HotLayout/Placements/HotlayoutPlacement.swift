@@ -36,7 +36,8 @@ public struct HotlayoutPlacement: Sendable {
     /// Once the place is decided, the documents of every window of its schedule are read in the
     /// background and kept, so a window that opens later shows its document with no network, and
     /// the place that is shown goes on being shown when the network is lost. A failed read keeps
-    /// the last copy; a 404 removes it. At most 64 documents are read this way.
+    /// the last copy; a 404 removes it. At most 64 documents are read this way. A read that ends
+    /// after a newer fresh map does not keep its document: that map decides what is kept.
     ///
     /// Never throws: every failure is a `report`.
     ///
@@ -60,17 +61,18 @@ public struct HotlayoutPlacement: Sendable {
             name: name, projectBase: projectBase, bundledMap: bundledMap, store: store, documents: documents, session: session, clock: clock
         )
         if let context = loaded.context, !Task.isCancelled {
-            Task.detached(priority: .utility) { await prefetch(name, context: context) }
+            let shown = loaded.placement.resolution.documentId
+            Task.detached(priority: .utility) { await prefetch(name, context: context, skipping: shown) }
         }
         return loaded.placement
     }
 
-    /// Reads and keeps the documents of every window of the place `name`, the one in force
-    /// included (it is asked with its kept `ETag`, so an unchanged one costs no body).
-    static func prefetch(_ name: String, context: Context) async {
-        for id in context.map.documentIds(of: name).prefix(prefetchMax) {
+    /// Reads and keeps the documents of every window of the place `name`. `skipping` is the
+    /// document the load has just read for the item in force; it is not asked twice.
+    static func prefetch(_ name: String, context: Context, skipping shown: String? = nil) async {
+        for id in context.map.documentIds(of: name).filter({ $0 != shown }).prefix(prefetchMax) {
             guard !Task.isCancelled else { return }
-            _ = await loadDocument(id: id, base: context.projectBase, documents: context.documents, transport: context.transport)
+            _ = await loadDocument(id: id, context: context)
         }
     }
 
@@ -83,6 +85,8 @@ public struct HotlayoutPlacement: Sendable {
         let projectBase: URL
         let documents: HotlayoutPlacementDocumentStore
         let transport: PlacementTransport
+        /// The epoch of the project's documents this map was decided in (`PlacementPruneGate`).
+        let epoch: Int
     }
 
     /// Reads the map, then shows the place at the moment the clock gives once the map is in.
@@ -107,8 +111,12 @@ public struct HotlayoutPlacement: Sendable {
             store.set(reply.etag, forKey: mapKey + ".etag")
         }
 
-        if decision.status == .fresh { prune(documents, base: projectBase, keeping: decision.map.documentIds()) }
-        let context = Context(map: decision.map, mapStatus: decision.status, projectBase: projectBase, documents: documents, transport: transport)
+        let epoch = decision.status == .fresh
+            ? prune(documents, base: projectBase, keeping: decision.map.documentIds())
+            : PlacementPruneGate.shared.epoch(documentsPrefix(projectBase))
+        let context = Context(
+            map: decision.map, mapStatus: decision.status, projectBase: projectBase, documents: documents, transport: transport, epoch: epoch
+        )
         return (await show(name, context: context, at: clock()), context)
     }
 
@@ -119,7 +127,7 @@ public struct HotlayoutPlacement: Sendable {
         var document: HotlayoutDocument?
         var documentOutcome: PlacementDocumentOutcome?
         if resolution.status == .document, let id = resolution.documentId {
-            let read = await loadDocument(id: id, base: context.projectBase, documents: context.documents, transport: context.transport)
+            let read = await loadDocument(id: id, context: context)
             guard !Task.isCancelled else { return cancelled(name) }
             document = read.document
             documentOutcome = read.outcome
@@ -158,18 +166,28 @@ public struct HotlayoutPlacement: Sendable {
         base.appendingPathComponent("documents").appendingPathComponent(id).appendingPathComponent("published.json")
     }
 
-    /// Removes the kept documents of this project that the map no longer names.
-    private static func prune(_ documents: HotlayoutPlacementDocumentStore, base: URL, keeping ids: Set<String>) {
-        let prefix = base.appendingPathComponent("documents").absoluteString + "/"
+    private static func documentsPrefix(_ base: URL) -> String {
+        base.appendingPathComponent("documents").absoluteString + "/"
+    }
+
+    /// Removes the kept documents of this project that the map no longer names, as the start of a
+    /// new epoch; returns that epoch.
+    private static func prune(_ documents: HotlayoutPlacementDocumentStore, base: URL, keeping ids: Set<String>) -> Int {
+        let prefix = documentsPrefix(base)
         let keep = Set(ids.map { documentKey($0, base: base) })
-        for key in documents.keys() where key.hasPrefix(prefix) && !keep.contains(key) {
-            documents.setDocument(nil, forKey: key)
+        return PlacementPruneGate.shared.prune(prefix) {
+            for key in documents.keys() where key.hasPrefix(prefix) && !keep.contains(key) {
+                documents.setDocument(nil, forKey: key)
+            }
         }
     }
 
+    /// Reads a document; the answer is kept only while the epoch of `context` holds, and shown
+    /// either way.
     private static func loadDocument(
-        id: String, base: URL, documents: HotlayoutPlacementDocumentStore, transport: PlacementTransport
+        id: String, context: Context
     ) async -> (document: HotlayoutDocument?, outcome: PlacementDocumentOutcome) {
+        let base = context.projectBase, documents = context.documents, transport = context.transport
         let key = documentKey(id, base: base)
         let kept = documents.document(forKey: key).flatMap { cached in (try? HotlayoutDocument.load(cached.data)).map { (cached, $0) } }
         let reply = await transport.get(documentURL(id, base: base), etag: kept?.0.etag, maxBytes: documentMaxBytes)
@@ -179,7 +197,9 @@ public struct HotlayoutPlacement: Sendable {
         switch PlacementAnswer.document(reply) {
         case .read:
             if reply.body.count <= documentMaxBytes, !Task.isCancelled, let document = try? HotlayoutDocument.load(reply.body) {
-                documents.setDocument(HotlayoutPlacementCachedDocument(data: reply.body, etag: reply.etag), forKey: key)
+                PlacementPruneGate.shared.keep(documentsPrefix(base), epoch: context.epoch) {
+                    documents.setDocument(HotlayoutPlacementCachedDocument(data: reply.body, etag: reply.etag), forKey: key)
+                }
                 return outcome(document)
             }
         case .notModified:

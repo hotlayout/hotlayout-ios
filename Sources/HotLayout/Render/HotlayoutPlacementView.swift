@@ -86,7 +86,9 @@ public struct HotlayoutPlacementView<Content: View>: View {
             apply(loaded.placement)
             scheduleRun += 1
             // Last, and in this task: it ends with the place, and the shown document is not waited for.
-            if let context = loaded.context { await HotlayoutPlacement.prefetch(name, context: context) }
+            if let context = loaded.context {
+                await HotlayoutPlacement.prefetch(name, context: context, skipping: loaded.placement.resolution.documentId)
+            }
         }
         .task(id: scheduleRun) { await followSchedule() }
         .onChange(of: scenePhase) { phase in

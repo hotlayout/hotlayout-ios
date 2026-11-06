@@ -75,6 +75,32 @@ final class PlacementAdversarialTests: XCTestCase {
         XCTAssertEqual(documents.keys(), [other])
     }
 
+    func testAReadAheadUnderAnOlderMapDoesNotBringBackWhatANewerMapDropped() async throws {
+        let files = Files()
+        files.put("/orgs/o/projects/p/documents/d1/published.json", document)
+        files.put("/orgs/o/projects/p/documents/d-sale/published.json", document)
+        let (base, _) = try start(files)
+        let store = HotlayoutMemoryPlacementStore()
+        let documents = HotlayoutMemoryPlacementDocumentStore()
+        func read() async -> HotlayoutPlacement.Context? {
+            await HotlayoutPlacement.read(
+                name: "home.banner", projectBase: base, bundledMap: nil, store: store, documents: documents, session: nil,
+                clock: { Date(timeIntervalSince1970: 0) }
+            ).context
+        }
+        files.put(
+            "/orgs/o/projects/p/placements/published.json",
+            #"{"placementsVersion":"1.1.0","placements":{"home.banner":{"documentId":"d1","schedule":[{"documentId":"d-sale","from":"2026-11-27T22:00:00Z","until":"2026-11-30T22:00:00Z"}]}}}"#
+        )
+        let first = await read()
+        let older = try XCTUnwrap(first)
+        // The sale is taken off before the read ahead of the first map has run.
+        files.put("/orgs/o/projects/p/placements/published.json", map(#""home.banner":{"documentId":"d1"}"#))
+        _ = await read()
+        await HotlayoutPlacement.prefetch("home.banner", context: older, skipping: "d1")
+        XCTAssertEqual(documents.keys(), [base.absoluteString + "/documents/d1/published.json"], "the newer map decides what is kept")
+    }
+
     func testDocumentsLiveInFilesAndNotInUserDefaults() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hl-placements-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }

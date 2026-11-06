@@ -51,6 +51,11 @@ Reads document contract **9.34.0**.
   table and a new row of the carousel width table (a card as wide as the screen with the zero
   spacing step everywhere).
 
+- **A place no longer keeps a document its map has dropped.** The documents of a schedule are read
+  ahead in the background; a read that ended after a newer map had been read could keep a document
+  that map no longer names, until the next fresh map. Such a read now shows its answer but does not
+  keep it, and the document already read for the item in force is not asked a second time.
+
 ## 0.4.0 - 2026-10-29
 
 Reads document contract **9.33.0** (theme 4.0.1, icon set 1.0.0) and placement map **1.1.0**. Folds in the entries that were prepared as 0.5.0 to 0.7.2 and never published (the last release is 0.3.0).
