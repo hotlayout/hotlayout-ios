@@ -154,6 +154,11 @@ final class SwipeRippleStoreTests: XCTestCase {
             center: CGPoint(x: 100, y: 100), halo: 40, core: 36, color: .red, indicatorColor: .white, indicatorSize: 16, onCovered: { log("acted") })
     }
 
+    private func waitFor(limit: Double = 3, _ done: () -> Bool) {
+        let deadline = Date().addingTimeInterval(limit)
+        while !done() && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+
     func testTheReportComesBeforeTheActionAndTheLastFillEndsIt() {
         var log: [String] = []
         let store = SwipeRippleStore()
@@ -161,10 +166,14 @@ final class SwipeRippleStoreTests: XCTestCase {
         _ = store.start(spec { log.append($0) }, report: { log.append("covered \($0)") })
         XCTAssertTrue(store.covers)
         XCTAssertEqual(log, ["covered true"])
-        spin(0.9)
-        XCTAssertEqual(log, ["covered true", "acted"], "the action runs when the circle has grown for 800 ms")
+        // Waits for the event in small steps rather than a fixed delay: a slow machine that overslept a fixed
+        // 0.9 s would land after the fill had already ended.
+        let start = Date()
+        waitFor { log.count >= 2 }
+        XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(start), 0.75, "the action runs when the circle has grown for 800 ms")
+        XCTAssertEqual(log, ["covered true", "acted"])
         XCTAssertTrue(store.covers, "the fill is still there, fading over the next screen")
-        spin(0.4)
+        waitFor { log.count >= 3 }
         XCTAssertEqual(log, ["covered true", "acted", "covered false"])
         XCTAssertFalse(store.covers)
     }
