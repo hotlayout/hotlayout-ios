@@ -41,13 +41,22 @@ extension View {
     /// last line only, and a text of several lines keeps the font's own pitch when the box is smaller.
     @ViewBuilder
     func lineBoxed(_ box: Double, natural: Double) -> some View {
+        // `lineHeight` exists only in the iOS 26 SDK: an app built with an older Xcode compiles the fallback alone.
+        #if compiler(>=6.2)
         if #available(iOS 26.0, macOS 26.0, *) {
             // The system puts the extra room (or takes the shortage) under the line; CSS shares it above and below.
             self.lineHeight(.exact(points: CGFloat(box))).offset(y: CGFloat((box - natural) / 2))
         } else {
-            let extra = box - natural
-            self.lineSpacing(extra).padding(.vertical, extra / 2)
+            leadingBoxed(box, natural: natural)
         }
+        #else
+        leadingBoxed(box, natural: natural)
+        #endif
+    }
+
+    private func leadingBoxed(_ box: Double, natural: Double) -> some View {
+        let extra = box - natural
+        return self.lineSpacing(extra).padding(.vertical, extra / 2)
     }
 }
 

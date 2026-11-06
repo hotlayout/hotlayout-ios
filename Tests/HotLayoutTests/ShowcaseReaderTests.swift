@@ -113,6 +113,9 @@ extension ShowcaseReaderTests {
     /// With a line box SMALLER than the natural line of the font, every line of a text of two lines is the box tall
     /// (the second one too), as in CSS.
     func testTwoLinesAreTwoLineBoxesWhenTheBoxIsSmallerThanTheFont() throws {
+        #if !compiler(>=6.2)
+        throw XCTSkip("the system line height needs the iOS 26 SDK")
+        #endif
         guard #available(iOS 26.0, macOS 26.0, *) else { throw XCTSkip("the system sets the line height from 26") }
         var theme = HotlayoutThemeSet.builtIn.theme(nil)
         theme.fontFamilies["body"] = "Menlo"

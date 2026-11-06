@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Builds with Xcode 16 again.** The exact line height of a text (`lineHeight`) exists only in the
+  iOS 26 SDK, and 0.5.0 called it behind a runtime check alone, so an app built with Xcode 16 did not
+  compile. The call is now compiled only by Swift 6.2 (Xcode 26); an older Xcode builds the leading
+  fallback that iOS before 26 uses anyway. CI builds and tests with Xcode 16.4 and the newest stable
+  Xcode.
+
 ## 0.5.0 - 2026-11-06
 
 Reads document contract **9.34.0**.
