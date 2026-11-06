@@ -32,7 +32,7 @@ final class GlassMaterialRulesTests: XCTestCase {
             }
         }
         let luma = GlassBlur.bandLuma(rgba: rgba, width: 4, height: 4, excluding: CGRect(x: 1, y: 1, width: 2, height: 2))
-        let pink = (0.299 * 244 + 0.587 * 114 + 0.114 * 182) / 255
+        let pink: Double = (0.299 * 244.0 + 0.587 * 114.0 + 0.114 * 182.0) / 255.0
         XCTAssertEqual(luma ?? -1, pink, accuracy: 0.0001)
         XCTAssertNil(GlassBlur.bandLuma(rgba: rgba, width: 4, height: 4, excluding: CGRect(x: 0, y: 0, width: 4, height: 4)))
     }
