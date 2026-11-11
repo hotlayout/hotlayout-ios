@@ -74,10 +74,30 @@ public struct ShadowLayer: Equatable, Sendable {
     public internal(set) var spread: Double
     /// The color of the layer.
     public internal(set) var color: RGBA
+    /// An inner layer: drawn inside the box, over its background and under its content.
+    public internal(set) var inset: Bool = false
 }
 
-/// A linear gradient of the theme.
+/// A gradient of the theme or of a node: linear, or a circle (`radial`).
 public struct GradientValue: Equatable, Sendable {
+    /// The circle of a radial gradient: its centre in the box and its radius as a share of the
+    /// distance from the centre to the farthest corner. The stop positions are shares of that radius.
+    public struct Radial: Equatable, Sendable {
+        /// The centre, 0…1 across the box, (0, 0) the top left, never mirrored in right-to-left text.
+        public let centerX: Double
+        /// The centre, 0…1 down the box.
+        public let centerY: Double
+        /// The radius, 0.05…2.
+        public let radius: Double
+
+        /// The radius in points for a box: `radius` times the distance from the centre to the farthest corner.
+        func radiusPoints(width: Double, height: Double) -> Double {
+            let dx = Swift.max(centerX * width, width - centerX * width)
+            let dy = Swift.max(centerY * height, height - centerY * height)
+            return radius * (dx * dx + dy * dy).squareRoot()
+        }
+    }
+
     /// A color at a position along a gradient.
     public struct Stop: Equatable, Sendable {
         /// The color at this stop.
@@ -86,10 +106,18 @@ public struct GradientValue: Equatable, Sendable {
         public var position: Double
     }
 
-    /// Degrees as CSS reads them: 0 is «to top», 90 «to right».
+    /// Degrees as CSS reads them: 0 is «to top», 90 «to right». Zero for a radial gradient.
     public let angle: Double
+    /// The circle of a radial gradient; `nil` for a linear one.
+    public let radial: Radial?
     /// The stops in order.
     public let stops: [Stop]
+
+    init(angle: Double, stops: [Stop], radial: Radial? = nil) {
+        self.angle = angle
+        self.stops = stops
+        self.radial = radial
+    }
 }
 
 /// The colors of one role (`roles.buttonVariant.primary`): names of theme colors.
@@ -350,14 +378,28 @@ enum ThemeReader {
             result.elevation[name] = read
         }
         for (name, value) in theme["gradient"]?.objectValue ?? JSONObject() {
-            guard let gradient = value.objectValue, let angle = gradient["angle"]?.numberValue else { continue }
+            guard let gradient = value.objectValue else { continue }
+            var radial: GradientValue.Radial?
+            var angle = 0.0
+            if gradient["shape"] != nil {
+                // A circle: the shape word, a centre and a radius; any other shape is an entry of the wrong form.
+                guard gradient["shape"]?.stringValue == "radial", gradient["angle"] == nil, let center = gradient["center"]?.objectValue,
+                    let x = ThemeNumbers.number(center["x"]), let y = ThemeNumbers.number(center["y"]), let radius = ThemeNumbers.number(gradient["radius"])
+                else { continue }
+                radial = GradientValue.Radial(
+                    centerX: fit(x, ThemeNumbers.unit, "gradient.\(name).center.x"), centerY: fit(y, ThemeNumbers.unit, "gradient.\(name).center.y"),
+                    radius: fit(radius, ThemeNumbers.radialRadius, "gradient.\(name).radius"))
+            } else {
+                guard let own = gradient["angle"]?.numberValue, gradient["center"] == nil, gradient["radius"] == nil else { continue }
+                angle = own
+            }
             var stops: [GradientValue.Stop] = []
             for (index, stop) in (gradient["stops"]?.arrayValue ?? []).enumerated() {
                 guard let stop = stop.objectValue, let color = stop["color"]?.stringValue.flatMap(RGBA.init(hex:)), let position = ThemeNumbers.number(stop["position"])
                 else { continue }
                 stops.append(GradientValue.Stop(color: color, position: fit(position, ThemeNumbers.unit, "gradient.\(name).stops[\(index)].position")))
             }
-            if stops.count >= 2 { result.gradient[name] = GradientValue(angle: angle, stops: stops) }
+            if stops.count >= 2 { result.gradient[name] = GradientValue(angle: angle, stops: stops, radial: radial) }
         }
         for (name, value) in theme["fontFamilies"]?.objectValue ?? JSONObject() {
             if let primary = value["primary"]?.stringValue { result.fontFamilies[name] = primary }

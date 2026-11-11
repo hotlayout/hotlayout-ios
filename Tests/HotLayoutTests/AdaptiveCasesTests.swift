@@ -41,13 +41,13 @@ final class AdaptiveCasesTests: XCTestCase {
     func testTableShape() {
         let counts: [String: Int] = [
             "classCases": 20, "layerCases": 3, "styleCases": 22, "propsCases": 27, "showCases": 22, "drawnCases": 7, "numberCases": 5, "tabCases": 4,
-            "weightCases": 5, "zoneCases": 5, "formCases": 6, "validityCases": 39, "contentCases": 22, "gridCases": 12, "boxCases": 12, "ruleCases": 20,
+            "weightCases": 5, "zoneCases": 5, "formCases": 6, "validityCases": 42, "contentCases": 22, "gridCases": 12, "boxCases": 12, "ruleCases": 20,
             "chromeCases": 35, "wideNavItemCases": 7, "wideNavHeightCases": 3, "wideAppBarCases": 23, "wideNavBarCases": 7, "wideZoneCases": 27,
             "wideModalCases": 14, "wideModalRadiusCases": 9, "wideSectionCases": 10, "wideModalContentCases": 10, "olderReaderShowOnCases": 10,
             "wideRuleCases": 21, "unsetStyleCases": 14, "unsetStateCases": 3, "unsetPropsCases": 7, "unsetDocumentCases": 12, "unsetScreenCases": 5,
         ]
         for (group, count) in counts { XCTAssertEqual(Self.rows(group).count, count, group) }
-        XCTAssertEqual(counts.values.reduce(0, +), 448)
+        XCTAssertEqual(counts.values.reduce(0, +), 451)
         for group in counts.keys { XCTAssertEqual(Set(Self.rows(group).map(Self.name)).count, Self.rows(group).count, "\(group): names repeat") }
     }
 

@@ -155,6 +155,9 @@ struct TextRichWidget: View {
                 }
             }
         }
+        // A text that runs its numbers writes ALL of its text in figures of equal width, at rest too: the place it
+        // holds and the number painted over it never differ in width.
+        .transformEnvironment(\.paintsTabularDigits) { $0 = $0 || ValueTransition.tabularFigures(type: node.type, props: node.props) }
     }
 }
 
@@ -168,16 +171,17 @@ struct TextRichContent: View {
         let style = NodeStyle.effective(node, scope: context.scope)
         let gradient = TextGradientRules.reference(type: node.type, style: style).flatMap { context.resolver.gradient($0) }
         let active = TextSpans.active(content: node.props["content"], spans: TextSpans.read(node.props["spans"]))
+        let shadows = TextShadowRules.layers(type: node.type, style: style, resolver: context.resolver) ?? []
         if marker == nil && active.isEmpty && gradient == nil {
-            TextWidget(node: node, context: context)
+            TextWidget(node: node, context: context, shadows: shadows)
         } else {
-            rich(marker: marker, gradient: gradient, active: active)
+            rich(marker: marker, gradient: gradient, active: active, shadows: shadows)
         }
     }
 
     private var emphasis: TextEmphasis { context.inherited.emphasis }
 
-    private func rich(marker: DrawnMarker?, gradient: GradientValue?, active: [String: TextSpanStyle]) -> some View {
+    private func rich(marker: DrawnMarker?, gradient: GradientValue?, active: [String: TextSpanStyle], shadows: [TextShadowLayer]) -> some View {
         let location = "screen “\(context.screenId)”: node “\(node.id)”: content"
         let runs = BindableText.runs(
             node.props["content"], language: context.language(node: node, field: "content"), environment: context.textEnvironment, sink: context.sink,
@@ -188,10 +192,10 @@ struct TextRichContent: View {
         let maxLines = node.props["overflow"]?.stringValue == "visible" ? nil : node.props["maxLines"]?.numberValue.map { SafeInt.clamped(min(20, max(1, $0))) }
         let paragraph = RichParagraph(
             plan: plan, theme: context.theme, fallback: context.inherited.color, gradient: gradient, alignment: textAlignment(align), maxLines: maxLines,
-            rightToLeft: context.rightToLeft)
+            rightToLeft: context.rightToLeft, shadows: shadows)
         return Group {
             if let marker {
-                markerRow(marker, plan: plan, paragraph: paragraph, align: align)
+                markerRow(marker, plan: plan, paragraph: paragraph, align: align, shadows: shadows)
             } else {
                 paragraph.frame(maxWidth: .infinity, alignment: horizontalAlignment(align))
             }
@@ -200,7 +204,7 @@ struct TextRichContent: View {
 
     /// The item: a column for the marker at the start, the gap, and the text hanging under its
     /// own first line (`x-style.layout.listMarker`).
-    private func markerRow(_ marker: DrawnMarker, plan: TextRichPlan, paragraph: RichParagraph, align: String?) -> some View {
+    private func markerRow(_ marker: DrawnMarker, plan: TextRichPlan, paragraph: RichParagraph, align: String?, shadows: [TextShadowLayer]) -> some View {
         let geometry = ListMarkerRules.geometry(marker, fontSize: plan.base.fontSize, groupSize: context.listNumber?.groupSize ?? position?.groupSize ?? 1)
         let text = ListMarkerRules.text(marker, number: context.listNumber?.number ?? position?.number ?? 1, formattingLocale: context.locale.formatting)
         let glyph = DrawnRun(
@@ -210,7 +214,7 @@ struct TextRichContent: View {
         return HStack(alignment: .firstTextBaseline, spacing: geometry.gap) {
             RichParagraph(
                 plan: markerPlan, theme: context.theme, fallback: context.inherited.color, gradient: nil, alignment: .trailing, maxLines: 1,
-                rightToLeft: context.rightToLeft, wraps: false
+                rightToLeft: context.rightToLeft, wraps: false, shadows: shadows
             )
             .frame(width: geometry.column, alignment: .trailing)
             paragraph.frame(maxWidth: .infinity, alignment: horizontalAlignment(align))
@@ -231,17 +235,23 @@ struct RichParagraph: View {
     let maxLines: Int?
     let rightToLeft: Bool
     var wraps = true
+    /// The shadow of the glyphs: copies of the whole paragraph in the colour of each layer, UNDER everything else, so an
+    /// opaque gradient over the letters hides it as a solid colour would.
+    var shadows: [TextShadowLayer] = []
     @Environment(\.paintsTabularDigits) private var tabularDigits
 
-    private enum Layer { case plain, gradientMask, gradientOwn }
+    private enum Layer: Equatable { case plain, gradientMask, gradientOwn, shadow(RGBA) }
 
     var body: some View {
-        if let gradient {
-            text(.gradientOwn)
-                .overlay { GradientFill(gradient: gradient).mask { text(.gradientMask) } }
-        } else {
-            text(.plain)
+        Group {
+            if let gradient {
+                text(.gradientOwn)
+                    .overlay { GradientFill(gradient: gradient).mask { text(.gradientMask) } }
+            } else {
+                text(.plain)
+            }
         }
+        .textShadowed(shadows, rightToLeft: rightToLeft) { text(.shadow($0)) }
     }
 
     private func segment(_ run: DrawnRun, _ layer: Layer, first: Bool) -> Text {
@@ -261,6 +271,10 @@ struct RichParagraph: View {
         case .gradientOwn:
             piece = piece.foregroundColor(takes ? .clear : run.color.color)
             piece = decorated(piece, line, takes ? fallback : run.color)
+        case .shadow(let ink):
+            // The whole text with the lines, in the colour of the layer.
+            piece = piece.foregroundColor(ink.color)
+            piece = decorated(piece, line, ink)
         }
         return piece
     }

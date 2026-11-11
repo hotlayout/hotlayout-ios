@@ -126,6 +126,7 @@ struct SwipeConfirmButton: View {
     /// The background, the border and the shadow of the track.
     private var surface: some View {
         look.shape.fill(look.trackFill?.color ?? .clear)
+            .innerShadows(look.shadow, shape: look.shape, borderWidth: look.borderWidth)
             .overlay {
                 if look.borderWidth > 0, let color = look.borderColor {
                     if look.dashedBorder {

@@ -25,6 +25,8 @@ enum ThemeNumbers {
     static let shadowBlur = Bounds(low: 0, high: 128)
     static let shadowSpread = Bounds(low: -64, high: 64)
     static let unit = Bounds(low: 0, high: 1)
+    /// The radius of a radial gradient, as a share of the distance to the farthest corner.
+    static let radialRadius = Bounds(low: 0.05, high: 2)
 
     /// A number of a theme as the reader takes it: an infinite one too (a JSON parser reads
     /// `1e309` as infinity), because the reader replaces it and does not skip it.

@@ -136,7 +136,7 @@ struct NodeBoxModifier: ViewModifier {
             // The content is clipped by the inner edge of the border (the padding box, as in CSS): the
             // background shows in the corner between the two radii.
             .clipped(to: InsetCorners(base: shape, amount: border), when: clipsContent && border > 0 && rounded)
-            .background(BackgroundView(background: look.background, shadow: look.shadow, shape: shape, context: context))
+            .background(BackgroundView(background: look.background, shadow: look.shadow, shape: shape, borderWidth: border, context: context))
             .clipped(to: shape, when: clipsContent)
             .overlay {
                 if let color = look.borderColor, border > 0 {
@@ -182,10 +182,12 @@ extension View {
     /// CSS shadows, drawn outside the box (`ShadowPaint`).
     @ViewBuilder
     func shadowLayers(_ layers: [ShadowLayer], shape: LogicalCornersShape) -> some View {
-        if layers.isEmpty {
+        // The inner layers lie inside the box (`innerShadows`); only the outer ones are drawn behind it.
+        let outer = layers.filter { !$0.inset }
+        if outer.isEmpty {
             self
         } else {
-            self.background(ShadowPaint(layers: layers, shape: shape))
+            self.background(ShadowPaint(layers: outer, shape: shape))
         }
     }
 }
@@ -194,9 +196,16 @@ struct BackgroundView: View {
     let background: BackgroundValue?
     let shadow: [ShadowLayer]
     let shape: LogicalCornersShape
+    /// The width of the border: the inner layers of the shadow are cut to the box inside it.
+    var borderWidth = 0.0
     let context: RenderContext
 
     var body: some View {
+        fill.innerShadows(shadow, shape: shape, borderWidth: borderWidth)
+    }
+
+    @ViewBuilder
+    private var fill: some View {
         switch background {
         case .color(let color)?:
             shape.fill(color.color)
@@ -251,9 +260,23 @@ struct GradientFill: View {
 
     var body: some View {
         GeometryReader { proxy in
-            Rectangle().fill(linearGradient(gradient, size: proxy.size))
+            if let radial = gradient.radial {
+                Rectangle().fill(radialGradient(gradient, radial, size: proxy.size))
+            } else {
+                Rectangle().fill(linearGradient(gradient, size: proxy.size))
+            }
         }
     }
+}
+
+/// A circle at (x·w, y·h) whose radius is a share of the distance from that point to the farthest corner. The
+/// stops are shares of the radius, the first colour fills the inside and the last one the outside of the circle; the
+/// centre is physical, it is not mirrored in right-to-left text.
+func radialGradient(_ gradient: GradientValue, _ radial: GradientValue.Radial, size: CGSize) -> RadialGradient {
+    let stops = gradient.stops.map { Gradient.Stop(color: $0.color.color, location: $0.position) }
+    return RadialGradient(
+        stops: stops, center: UnitPoint(x: radial.centerX, y: radial.centerY), startRadius: 0,
+        endRadius: CGFloat(radial.radiusPoints(width: Double(size.width), height: Double(size.height))))
 }
 
 extension View {

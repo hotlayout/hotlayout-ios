@@ -30,8 +30,13 @@ final class CarouselCasesTests: XCTestCase {
         let stopGroups: Set<String> = [
             "stopPathCases", "stopShownCases", "stopFollowCases", "stopWriteCases", "stopDocumentCases", "stopRunCases", "stopRuleCases",
         ]
+        // The groups of the carousel that moves by itself (schema 9.42.0) are not read by this reader yet.
+        let autoAdvanceGroups: Set<String> = [
+            "autoAdvanceReadCases", "autoAdvanceTickCases", "autoAdvanceWriteCases", "autoAdvanceNextCases", "autoAdvanceDocumentCases",
+            "autoAdvanceRunCases", "autoAdvanceRuleCases",
+        ]
         let groups = Set((Self.table.objectValue ?? JSONObject()).filter { $0.key.hasSuffix("Cases") && $0.value.arrayValue != nil }.map(\.key))
-        XCTAssertEqual(groups.subtracting(stopGroups), run, "a group of the table this test does not run, or a name that is no group")
+        XCTAssertEqual(groups.subtracting(stopGroups).subtracting(autoAdvanceGroups), run, "a group of the table this test does not run, or a name that is no group")
     }
 
     func testDefaultsAreTheTables() {

@@ -12,25 +12,60 @@ struct StyledText: View {
     var alignment: TextAlignment = .leading
     var maxLines: Int?
     var truncate = true
+    /// The shadow of the glyphs (`style.textShadow`): it takes no room and paints under the text.
+    var shadows: [TextShadowLayer] = []
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.paintsTabularDigits) private var tabularDigits
 
     var body: some View {
         let family = theme.fontFamilies[style.role == "heading" ? "heading" : "body"]
-        var base = styledRun(text, style: style, family: family, italic: italic, rightToLeft: layoutDirection == .rightToLeft, leadsParagraph: true)
-        if tabularDigits { base = base.monospacedDigit() }
-        if decoration == "underline" { base = base.underline() }
-        if decoration == "lineThrough" { base = base.strikethrough() }
+        var run = styledRun(text, style: style, family: family, italic: italic, rightToLeft: layoutDirection == .rightToLeft, leadsParagraph: true)
+        if tabularDigits { run = run.monospacedDigit() }
+        let base = run
+        func laidOut(_ ink: RGBA) -> some View {
+            var piece = base
+            // The line of an underline or a strike-through is shadowed with the glyphs of the same text.
+            if decoration == "underline" { piece = piece.underline(true, color: ink.color) }
+            if decoration == "lineThrough" { piece = piece.strikethrough(true, color: ink.color) }
+            return
+                piece
+                .foregroundColor(ink.color)
+                .lineBoxed(style.lineBox, natural: style.naturalLineHeight(in: theme))
+                .multilineTextAlignment(alignment)
+                .lineLimit(maxLines)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+        }
         return
-            base
-            .foregroundColor(color.color)
-            .lineBoxed(style.lineBox, natural: style.naturalLineHeight(in: theme))
-            .multilineTextAlignment(alignment)
-            .lineLimit(maxLines)
-            .truncationMode(.tail)
-            .fixedSize(horizontal: false, vertical: true)
+            laidOut(color)
+            .textShadowed(shadows, rightToLeft: layoutDirection == .rightToLeft, copy: laidOut)
             // The mark that leads the paragraph is drawn only; assistive technology reads the string.
             .accessibilityLabel(Text(verbatim: BidiText.limited(text)))
+    }
+}
+
+extension View {
+    /// The shadow of a text: a copy of the text in the colour of each layer under it, blurred by half the blur and
+    /// moved by the offset along the screen axes (the offset is physical, SwiftUI mirrors it in right-to-left text).
+    /// The first layer lies nearest to the text and on top. The copies are the same paragraph, so they take no room and
+    /// are no part of what assistive technology reads.
+    @ViewBuilder
+    func textShadowed<Copy: View>(_ layers: [TextShadowLayer], rightToLeft: Bool, copy: @escaping (RGBA) -> Copy) -> some View {
+        if layers.isEmpty {
+            self
+        } else {
+            self.background {
+                ZStack {
+                    ForEach(Array(TextShadowRules.bottomFirst(layers).enumerated()), id: \.offset) { _, layer in
+                        copy(layer.color)
+                            .blur(radius: layer.blur / 2)
+                            .offset(x: rightToLeft ? -layer.offsetX : layer.offsetX, y: layer.offsetY)
+                    }
+                }
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
+            }
+        }
     }
 }
 
@@ -72,6 +107,7 @@ func textAlignment(_ word: String?) -> TextAlignment {
 struct TextWidget: View {
     let node: DocumentNode
     let context: RenderContext
+    var shadows: [TextShadowLayer] = []
 
     var body: some View {
         let align = node.props["align"]?.stringValue
@@ -84,7 +120,8 @@ struct TextWidget: View {
             italic: context.inherited.fontStyleItalic,
             decoration: context.inherited.decoration,
             alignment: textAlignment(align),
-            maxLines: node.props["overflow"]?.stringValue == "visible" ? nil : maxLines
+            maxLines: node.props["overflow"]?.stringValue == "visible" ? nil : maxLines,
+            shadows: shadows
         )
         .frame(maxWidth: .infinity, alignment: horizontalAlignment(align))
     }
@@ -209,11 +246,14 @@ struct ButtonWidget: View {
                 // by the node's own box (`NodeView.boxLook`).
                 .frame(maxHeight: ownLook.height != nil || ownLook.minHeight != nil ? .infinity : nil)
                 .background {
-                    if let gradient {
-                        GradientFill(gradient: gradient).clipShape(shape)
-                    } else {
-                        AnyShapeStyleFill(shape: shape, style: AnyShapeStyle(background?.color ?? .clear))
+                    ZStack {
+                        if let gradient {
+                            GradientFill(gradient: gradient).clipShape(shape)
+                        } else {
+                            AnyShapeStyleFill(shape: shape, style: AnyShapeStyle(background?.color ?? .clear))
+                        }
                     }
+                    .innerShadows(ShadowTint.apply(resolver.shadow(style["shadow"]) ?? [], style: style, resolver: resolver), shape: shape, borderWidth: borderWidth)
                 }
                 .overlay {
                     if let borderColor, borderWidth > 0 {

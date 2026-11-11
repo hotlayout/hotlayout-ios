@@ -63,7 +63,7 @@ extension View {
     /// Draws the box of a role surface around the content: background, border, shadow, shape.
     func roleBox(_ surface: RoleSurface, shape: LogicalCornersShape) -> some View {
         self
-            .background(surface.fill(shape: shape, rightToLeft: shape.rightToLeft))
+            .background(surface.fill(shape: shape, rightToLeft: shape.rightToLeft).innerShadows(surface.shadow, shape: shape, borderWidth: surface.borderWidth))
             .overlay {
                 if let color = surface.borderColor, surface.borderWidth > 0 {
                     if surface.borderDashed {

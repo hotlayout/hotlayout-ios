@@ -37,11 +37,12 @@ final class TextTransitionWiringTests: XCTestCase {
         let node = try points([("animateIn", true)])
         let plain = try points()
         // 175 ms of 700: e = 0.578125, 80 × e = 46.25, whole steps cut towards zero: 46.
-        // The number in between is painted with figures of equal width.
+        // A text that runs its numbers is written with figures of equal width ALWAYS, the number in between
+        // and the final one alike, so the reference is drawn with them too.
         XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 0), picture(plain, scope: ["p": 0], tabular: true)), "the first frame shows zero")
         XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 175), picture(plain, scope: ["p": 46], tabular: true)), "mid-transition the node shows an intermediate number")
         XCTAssertFalse(same(picture(node, scope: ["p": 80], elapsedMs: 175), picture(plain, scope: ["p": 80])))
-        XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 700), picture(plain, scope: ["p": 80])), "at the end the final number")
+        XCTAssertTrue(same(picture(node, scope: ["p": 80], elapsedMs: 700), picture(plain, scope: ["p": 80], tabular: true)), "at the end the final number")
     }
 
     func testAnimateChangesLeadsFromTheOldNumberThroughTheSameFormat() throws {

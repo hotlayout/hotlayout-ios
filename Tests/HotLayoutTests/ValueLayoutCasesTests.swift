@@ -109,7 +109,8 @@ final class ValueLayoutCasesTests: XCTestCase {
         let node = try node(animates: "animateIn")
         let plain = try self.node(animates: "none")
         let end = picture(node, scope: ["p": 9_999_999], elapsedMs: 700)
-        let final = picture(plain, scope: ["p": 9_999_999], elapsedMs: nil)
-        XCTAssertEqual(end.data, final.data, "no tabular figures, no second layer once the motion ends")
+        // The final text keeps its figures of equal width at rest: the box does not change when the motion ends.
+        let final = picture(plain, scope: ["p": 9_999_999], elapsedMs: nil, tabular: true)
+        XCTAssertEqual(end.data, final.data, "no second layer once the motion ends, and the figures are those of the motion")
     }
 }

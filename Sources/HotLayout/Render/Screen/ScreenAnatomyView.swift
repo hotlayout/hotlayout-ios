@@ -76,8 +76,8 @@ struct ScreenRootView: View {
 
         ZStack {
             BackgroundView(
-                background: look.background, shadow: [], shape: LogicalCornersShape(corners: look.radius ?? Corners(), rightToLeft: context.rightToLeft),
-                context: inner
+                background: look.background, shadow: look.shadow, shape: LogicalCornersShape(corners: look.radius ?? Corners(), rightToLeft: context.rightToLeft),
+                borderWidth: look.borderWidth ?? 0, context: inner
             )
             .ignoresSafeArea()
             ScreenZonesLayout(settings: plan.settings(keyboard: keyboard)) {

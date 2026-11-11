@@ -226,7 +226,7 @@ final class AdaptiveLayoutTests: XCTestCase {
                 drawn += 1
             }
         }
-        XCTAssertEqual(drawn, 39 * 3)
+        XCTAssertEqual(drawn, 42 * 3)
     }
 
     /// A field of the wrong shape does not stop the screen: drawn at every width.

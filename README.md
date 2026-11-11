@@ -115,9 +115,9 @@ Standard actions arrive at `onAction` already checked, and the reader opens noth
 
 | What | Version |
 |---|---|
-| Package | `0.5.1` |
-| Document contract (schema) | `9.34.0` |
-| Theme contract | `4.0.1` |
+| Package | `0.6.0` |
+| Document contract (schema) | `9.42.0` |
+| Theme contract | `4.1.0` |
 | Built-in icon set | `1.0.0` |
 
 The major version must match; a newer minor is readable, and parts this package does not know degrade instead of failing. What changed in each package version is in [CHANGELOG.md](CHANGELOG.md).

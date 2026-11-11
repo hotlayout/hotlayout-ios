@@ -84,10 +84,13 @@ struct ProgressBarContent: View {
             if let label {
                 let style = theme.coreTypography(ProgressRules.defaultLabelTypography)
                 let color = theme.coreColor(ProgressRules.barLabelColor)
+                // The label of a bar whose value runs is written in figures of equal width always, so the label that
+                // holds the place and the one painted over it never differ in width.
+                let tabular = ValueTransition.tabularFigures(type: node.type, props: props)
                 let line = { (text: String) in
                     Text(text)
                         .font(style.font(family: theme.fontFamilies["body"]))
-                        .monospacedDigit()
+                        .modifier(TabularDigits(on: tabular))
                         .foregroundColor(color.color)
                         .lineLimit(1)
                         .fixedSize()
@@ -211,5 +214,14 @@ struct ProgressBarScale: View {
         layer.clip(to: shape)
         let cut = rect(start: start, length: length * Swift.min(1, share), width: width, height: Double(frame.height))
         layer.fill(Path(cut), with: shading)
+    }
+}
+
+/// Figures of equal width when asked, the figures of the font otherwise.
+struct TabularDigits: ViewModifier {
+    let on: Bool
+
+    func body(content: Content) -> some View {
+        if on { content.monospacedDigit() } else { content }
     }
 }

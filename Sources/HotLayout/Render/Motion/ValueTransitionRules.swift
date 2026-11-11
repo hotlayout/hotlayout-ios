@@ -121,6 +121,14 @@ enum ValueTransition {
     static func animatesChanges(_ props: JSONObject) -> Bool { props["animateChanges"]?.boolValue == true }
     static func animatesIn(_ props: JSONObject) -> Bool { props["animateIn"]?.boolValue == true }
 
+    /// Whether a node writes its text in figures of equal width ALWAYS (at rest, between values and in the place that
+    /// is held): a `Text` or the label of a `ProgressBar` with `animateIn` or `animateChanges` set to the literal `true`.
+    /// A node with neither keeps the figures of its font. The label of a ring is tabular whatever its fields say.
+    static func tabularFigures(type: String, props: JSONObject) -> Bool {
+        guard WidgetType(type) == .text || WidgetType(type) == .progressBar else { return false }
+        return animatesChanges(props) || animatesIn(props)
+    }
+
     /// Text formats counted through: none, `number` and `currency`. A date, `daysUntil` and a
     /// countdown part are not.
     private static func transitionsInText(_ format: String?) -> Bool {

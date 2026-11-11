@@ -140,10 +140,16 @@ struct StyleResolver {
             return theme.typography[token]
         case .object(let object)?:
             guard let token = object["token"]?.stringValue, var style = theme.typography[token] else { return nil }
-            if let size = object["fontSize"]?.numberValue { style.fontSize = Self.clamp(size, 8, 96) }
+            if let size = object["fontSize"]?.numberValue { style.fontSize = Self.clamp(size, 8, DisplayTypography.maxOverrideFontSize) }
             if let weight = object["fontWeight"]?.numberValue { style.fontWeight = SafeInt.clamped(Self.clamp(weight, 100, 900)) }
             if let line = object["lineHeight"]?.numberValue { style.lineHeight = Self.clamp(line, 0.8, 3) }
             if let spacing = object["letterSpacing"]?.numberValue { style.letterSpacing = Self.clamp(spacing, -2, 8) }
+            // Tracking in shares of the font size wins over pixels (a document that names both is not published; a
+            // reader that gets it takes the shares) and replaces the tracking of the token.
+            if let share = object["letterSpacingEm"]?.numberValue {
+                style.letterSpacing = DisplayTypography.trackingPx(
+                    letterSpacingEm: Self.clamp(share, DisplayTypography.minTrackingShare, DisplayTypography.maxTrackingShare), effectiveFontSize: style.fontSize)
+            }
             return style
         default:
             return nil
@@ -165,7 +171,9 @@ struct StyleResolver {
                         offsetY: Self.clamp(layer["offsetY"]?.numberValue ?? 0, -64, 64),
                         blur: Self.clamp(layer["blur"]?.numberValue ?? 0, 0, 128),
                         spread: Self.clamp(layer["spread"]?.numberValue ?? 0, -64, 64),
-                        color: color
+                        color: color,
+                        // Only the flag `true` makes a layer inner; any other value leaves it an outer one.
+                        inset: layer["inset"]?.boolValue == true
                     ))
             }
             return result
@@ -174,12 +182,42 @@ struct StyleResolver {
         }
     }
 
+    /// The shadow of the glyphs of a text (`style.textShadow`): one or two layers, the first nearest the text and on top.
+    /// An empty list, more than two layers or a layer that does not read is no shadow.
+    func textShadow(_ ref: JSONValue?) -> [TextShadowLayer]? {
+        guard let layers = ref?.arrayValue, (1...DisplayTypography.maxTextShadowLayers).contains(layers.count) else { return nil }
+        var result: [TextShadowLayer] = []
+        for layer in layers {
+            guard let layer = layer.objectValue, let color = color(layer["color"]) else { return nil }
+            result.append(
+                TextShadowLayer(
+                    offsetX: Self.clamp(layer["offsetX"]?.numberValue ?? 0, -64, 64), offsetY: Self.clamp(layer["offsetY"]?.numberValue ?? 0, -64, 64),
+                    blur: Self.clamp(layer["blur"]?.numberValue ?? 0, 0, 128), color: color))
+        }
+        return result
+    }
+
     func gradient(_ ref: JSONValue?) -> GradientValue? {
         switch ref {
         case .string(let token)?:
             return theme.gradient[token]
         case .object(let object)?:
-            guard let angle = object["angle"]?.numberValue, let stops = object["stops"]?.arrayValue, (2...8).contains(stops.count) else { return nil }
+            guard let stops = object["stops"]?.arrayValue, (2...8).contains(stops.count) else { return nil }
+            // The form first: a circle names its `shape` and has a centre and a radius, a line has an angle and none
+            // of them. An unknown shape, or one form wearing the fields of the other, is no gradient.
+            var angle = 0.0
+            var radial: GradientValue.Radial?
+            if object["shape"] != nil {
+                guard object["shape"]?.stringValue == "radial", object["angle"] == nil, let center = object["center"]?.objectValue,
+                    center["x"] != nil, center["y"] != nil, object["radius"] != nil
+                else { return nil }
+                radial = GradientValue.Radial(
+                    centerX: Self.clamp(center["x"]?.numberValue ?? 0, 0, 1), centerY: Self.clamp(center["y"]?.numberValue ?? 0, 0, 1),
+                    radius: Self.clamp(object["radius"]?.numberValue ?? ThemeNumbers.radialRadius.low, ThemeNumbers.radialRadius.low, ThemeNumbers.radialRadius.high))
+            } else {
+                guard let own = object["angle"]?.numberValue, object["center"] == nil, object["radius"] == nil else { return nil }
+                angle = own
+            }
             var result: [GradientValue.Stop] = []
             for stop in stops {
                 guard let stop = stop.objectValue, let color = color(stop["color"]), let position = stop["position"]?.numberValue else { return nil }
@@ -187,7 +225,7 @@ struct StyleResolver {
             }
             // Stops out of order are not drawn (`unorderedGradient: 'do-not-draw'`).
             guard zip(result, result.dropFirst()).allSatisfy({ $0.position <= $1.position }) else { return nil }
-            return GradientValue(angle: angle, stops: result)
+            return GradientValue(angle: angle, stops: result, radial: radial)
         default:
             return nil
         }
