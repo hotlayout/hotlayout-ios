@@ -24,9 +24,8 @@ final class PressCasesTests: XCTestCase {
         "actions/flowCases": "run by ActionCasesTests", "actions/writeCases": "run by WriteCasesTests",
         "actions/writeControlCases": "run by WriteCasesTests", "actions/writeSchemaCases": "verdicts of the schema",
         "actions/writeDocumentCases": "verdicts of the validator", "actions/writeTreeCases": "run by WriteCasesTests",
-        "actions/copyShareDocumentCases": "host actions copy and share (schema 9.41.0): not read by this reader yet",
-        "actions/copyShareFormCases": "host actions copy and share (schema 9.41.0): not read by this reader yet",
-        "actions/copyShareHandedCases": "host actions copy and share (schema 9.41.0): not read by this reader yet",
+        "actions/copyShareDocumentCases": "verdicts of the validator", "actions/copyShareFormCases": "run by ActionCasesTests",
+        "actions/copyShareHandedCases": "run by ActionCasesTests",
         "actions/writePressCases": "run by WriteCasesTests", "actions/hapticSchemaCases": "verdicts of the schema",
     ]
 

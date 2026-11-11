@@ -118,7 +118,7 @@ final class NumberConversionSweepTests: XCTestCase {
     func testRepeaterLimitAndGridColumns() {
         XCTAssertEqual(RepeaterPlan.limit(["limit": .number(huge)]), RepeaterPlan.maxItems)
         XCTAssertEqual(RepeaterPlan.limit(["limit": .number(-huge)]), 1)
-        XCTAssertEqual(gridColumns(.number(huge), overridden: false), 4)
+        XCTAssertEqual(gridColumns(.number(huge), overridden: false), 6)
         XCTAssertEqual(gridColumns(.number(-huge)), 1)
     }
 

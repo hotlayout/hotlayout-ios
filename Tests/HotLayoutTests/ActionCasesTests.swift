@@ -64,6 +64,12 @@ final class ActionCasesTests: XCTestCase {
         case .openURL(let url)?: object["standard"] = ["type": "openUrl", "url": .string(url)]
         case .deeplink(let url, let scheme)?: object["standard"] = ["type": "deeplink", "url": .string(url), "scheme": .string(scheme)]
         case .close?: object["standard"] = ["type": "close"]
+        case .copy(let text)?: object["standard"] = ["type": "copy", "text": .string(text)]
+        case .share(let text, let url)?:
+            var standard: JSONObject = ["type": "share"]
+            if let text { standard["text"] = .string(text) }
+            if let url { standard["url"] = .string(url) }
+            object["standard"] = .object(standard)
         case nil: break
         }
         if let invalid = action.invalid { object["invalid"] = ["param": .string(invalid.param), "problem": .string(invalid.problem.rawValue)] }
@@ -78,6 +84,54 @@ final class ActionCasesTests: XCTestCase {
             let handed = ActionCatalog.handed(action, scope: Contract.scope(row["data"]))
             XCTAssertEqual(Self.handedJSON(handed), Self.expand(row["handed"] ?? .null), row["name"]?.stringValue ?? "?")
         }
+    }
+
+    func testCopyShareFormCases() {
+        let rows = Contract.rows(Self.table, "copyShareFormCases")
+        XCTAssertEqual(rows.count, 8)
+        for row in rows {
+            let value: String?
+            if let spec = row["repeat"]?.objectValue { value = Self.built(spec) } else { value = row["value"]?.stringValue }
+            let problem = ActionCatalog.formProblem(row["form"]?.stringValue ?? "", value)
+            XCTAssertEqual(problem?.rawValue, row["problem"]?.stringValue, row["name"]?.stringValue ?? "?")
+        }
+    }
+
+    func testCopyShareHandedCases() {
+        let rows = Contract.rows(Self.table, "copyShareHandedCases")
+        XCTAssertEqual(rows.count, 16)
+        for row in rows {
+            let action = Self.expand(row["action"] ?? .null).objectValue ?? JSONObject()
+            let handed = ActionCatalog.handed(action, scope: Contract.scope(row["data"]))
+            XCTAssertEqual(Self.handedJSON(handed), Self.expand(row["handed"] ?? .null), row["name"]?.stringValue ?? "?")
+            // A standard action carries something to do; `share` never an empty field; the address passes its form.
+            switch handed.standard {
+            case .share(let text, let url)?:
+                XCTAssertTrue(text != nil || url != nil, row["name"]?.stringValue ?? "?")
+                XCTAssertNotEqual(text, "")
+                if let url { XCTAssertNil(ActionCatalog.formProblem("httpsUrl", url), row["name"]?.stringValue ?? "?") }
+            case .copy(let text)?:
+                XCTAssertFalse(text.isEmpty, row["name"]?.stringValue ?? "?")
+            default:
+                break
+            }
+        }
+    }
+
+    func testHelpersForTheHost() {
+        let copy = ActionCatalog.handed(["type": "copy", "params": ["text": "ORB-7Q2K"]], scope: [:])
+        XCTAssertEqual(StandardActions.copiedText(for: copy), "ORB-7Q2K")
+        XCTAssertNil(StandardActions.shareItems(for: copy))
+        let share = ActionCatalog.handed(["type": "share", "params": ["text": "Join me", "url": "https://example.com/p"]], scope: [:])
+        let items = StandardActions.shareItems(for: share)
+        XCTAssertEqual(items?.count, 2)
+        XCTAssertEqual(items?.first as? String, "Join me")
+        XCTAssertEqual(items?.last as? URL, URL(string: "https://example.com/p"))
+        XCTAssertNil(StandardActions.copiedText(for: share))
+        // A parameter that failed its form hands nothing to do.
+        let invalid = ActionCatalog.handed(["type": "share", "params": ["text": "Join me", "url": "http://example.com"]], scope: [:])
+        XCTAssertNil(StandardActions.shareItems(for: invalid))
+        XCTAssertNil(StandardActions.copiedText(for: ActionCatalog.handed(["type": "copy"], scope: [:])))
     }
 
     static func shownJSON(_ event: ScreenShownEvent?) -> JSONValue {

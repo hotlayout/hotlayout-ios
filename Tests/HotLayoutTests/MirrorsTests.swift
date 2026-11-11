@@ -55,8 +55,7 @@ final class MirrorsTests: XCTestCase {
 
     func testWidgetListMirrorsTheArtifact() throws {
         let widgets = try Contract.json("screen-schema.json")["x-compatibility"]?["widgets"]?.objectValue ?? JSONObject()
-        // `Chart` (schema 9.37.0) is not read by this reader yet.
-        XCTAssertEqual(DocumentReader.knownWidgets, Set(widgets.keys).subtracting(["Chart"]))
+        XCTAssertEqual(DocumentReader.knownWidgets, Set(widgets.keys))
     }
 
     static func libraryResource(_ name: String) -> URL? {

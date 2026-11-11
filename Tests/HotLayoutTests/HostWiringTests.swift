@@ -53,6 +53,56 @@ final class HostWiringTests: XCTestCase {
         XCTAssertEqual(recorder.log, ["haptic success", "track redeemed", "action redeem"])
     }
 
+    func testCopyAndShareArriveAsCheckedStandardActions() throws {
+        let recorder = Recorder()
+        let doc = try document([
+            (
+                "a",
+                [
+                    button("copy", "Copy code", ["type": "copy", "params": ["text": "ORB-7Q2K-91"]]),
+                    button("share", "Share", ["type": "share", "params": ["text": "Join me", "url": "https://example.com/promo"]]),
+                    button("empty", "Share nothing", ["type": "share"]),
+                ]
+            )
+        ])
+        let view = host(HotlayoutScreen(
+            document: doc, locale: "en",
+            onAction: { action, _ in
+                let verdict: String
+                switch action.standard {
+                case .copy(let text)?: verdict = "copy \(text)"
+                case .share(let text, let url)?: verdict = "share \(text ?? "-") \(url ?? "-")"
+                default: verdict = "invalid \(action.invalid?.param ?? "?") \(action.invalid?.problem.rawValue ?? "?")"
+                }
+                recorder.log.append("\(action.type): \(verdict)")
+            }
+        ))
+        for label in ["Copy code", "Share", "Share nothing"] {
+            XCTAssertTrue(press(try XCTUnwrap(find(view, label: label))), label)
+            spin(0.2)
+        }
+        XCTAssertEqual(
+            recorder.log,
+            ["copy: copy ORB-7Q2K-91", "share: share Join me https://example.com/promo", "share: invalid text missing"])
+    }
+
+    func testAChartIsOnePictureNamedByAltAndAnUnnamedOneIsHidden() throws {
+        func chart(_ id: String, alt: String?) -> JSONValue {
+            var props: JSONObject = [
+                "variant": "bars", "labels": true,
+                "data": ["kind": "literal", "points": [["value": 4, "label": "Mon"], ["value": 6, "label": "Tue"]]],
+            ]
+            if let alt { props["alt"] = ["kind": "literal", "value": .string(alt)] }
+            return ["id": .string(id), "type": "Chart", "props": .object(props), "style": ["height": 80]]
+        }
+        let named = host(HotlayoutScreen(document: try document([("a", [chart("c", alt: "Spending by day")])]), locale: "en"))
+        XCTAssertNotNil(find(named, label: "Spending by day"))
+        XCTAssertFalse(shows(named, "Mon"), "the labels are part of the picture, not read one by one")
+        let plain = host(HotlayoutScreen(document: try document([("a", [chart("c", alt: nil)])]), locale: "en"))
+        XCTAssertFalse(shows(plain, "Mon"))
+        XCTAssertNil(find(plain, label: "Spending by day"))
+    }
+
     func testTheHostCanCancelANavigation() throws {
         let recorder = Recorder()
         var allow = false

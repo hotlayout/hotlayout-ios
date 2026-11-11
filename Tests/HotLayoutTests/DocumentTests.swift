@@ -9,12 +9,9 @@ final class DocumentTests: XCTestCase {
         let folder = Contract.root.appendingPathComponent("fixtures")
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter { $0.pathExtension == "json" }
         XCTAssertGreaterThan(files.count, 30)
-        // `Chart` (schema 9.37.0) is not read by this reader yet: it draws the children, which a chart has none of.
-        let notReadYet: Set<String> = ["chart-screens.json"]
         for file in files {
             let document = try HotlayoutDocument.load(Data(contentsOf: file))
             XCTAssertFalse(document.screens.isEmpty, file.lastPathComponent)
-            if notReadYet.contains(file.lastPathComponent) { continue }
             XCTAssertFalse(document.reports.contains { $0.kind == .unknownWidget }, "\(file.lastPathComponent): \(document.reports)")
         }
     }

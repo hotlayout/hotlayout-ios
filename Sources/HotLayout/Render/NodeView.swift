@@ -183,6 +183,8 @@ struct NodeView: View {
             DividerWidget(node: node, context: context)
         case .progressBar:
             ProgressBarWidget(node: node, context: context)
+        case .chart:
+            ChartWidget(node: node, context: context, look: context.resolver.box(style, scope: self.context.scope))
         case .circularProgress:
             // Under a row weight the width fields of the style do not name the diameter.
             CircularProgressWidget(node: node, context: context, style: style, widthApplies: !placement.stretchWidth)

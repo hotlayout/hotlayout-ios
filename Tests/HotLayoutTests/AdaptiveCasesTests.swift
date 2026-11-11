@@ -132,14 +132,15 @@ final class AdaptiveCasesTests: XCTestCase {
         }
     }
 
-    /// The columns of the base keep their bounds 2…4, a number of a layer is read as 1…6.
+    /// The columns of the base keep their bounds 2…6, a number of a layer is read as 1…6.
     func testColumnsBounds() {
         func columns(_ spec: JSONValue, _ widthClass: WidthClass) -> Int? {
             let node = Self.node(spec, type: "Grid").inWidthClass(widthClass)
             return gridColumns(node.props["columns"], overridden: node.columnsFromOverride)
         }
         let base = JSONValue.object(JSONObject([("type", "Grid"), ("props", ["columns": 9])]))
-        XCTAssertEqual(columns(base, .expanded), 4)
+        XCTAssertEqual(columns(base, .expanded), 6)
+        XCTAssertEqual(columns(.object(JSONObject([("type", "Grid"), ("props", ["columns": 5])])), .compact), 5)
         XCTAssertEqual(columns(.object(JSONObject([("type", "Grid"), ("props", ["columns": 1])])), .compact), 2)
         let layered = JSONValue.object(JSONObject([("type", "Grid"), ("props", ["columns": 2]), ("propsOn", ["medium": ["columns": 1], "expanded": ["columns": 99]])]))
         XCTAssertEqual(columns(layered, .compact), 2)

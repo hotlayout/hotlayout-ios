@@ -109,7 +109,7 @@ struct RewardsScreen: View {
 }
 ```
 
-Standard actions arrive at `onAction` already checked, and the reader opens nothing itself: you decide what a URL or a deep link does. `Locale.current` reports the device language only if the app declares its localizations; the [reference](https://hotlayout.com/docs/integrator/ios-reference) says how.
+Standard actions arrive at `onAction` already checked, and the reader opens nothing itself: you decide what a URL, a deep link, a `copy` or a `share` does (`StandardActions` has helpers for each; iOS shows no confirmation after a copy, so a short "Copied" is yours to show). `Locale.current` reports the device language only if the app declares its localizations; the [reference](https://hotlayout.com/docs/integrator/ios-reference) says how.
 
 ## Versions
 

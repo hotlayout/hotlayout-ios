@@ -27,9 +27,10 @@ public struct ScreenLabels: Equatable, Sendable {
 /// Draws a HotLayout document: the screen the flow is on, with the stack of screens the
 /// reader navigates itself (`navigate`, `navigate.back`, `navigate.section`).
 ///
-/// The reader opens nothing by itself. Every other action — `openUrl`, `deeplink`, `close`
-/// and the actions of the app — goes to `onAction`, already checked: a standard action carries
-/// `standard` or `invalid`. `StandardActions.url(for:)` helps a host that wants to open it.
+/// The reader opens nothing by itself and copies nothing. Every other action — `openUrl`, `deeplink`,
+/// `close`, `copy`, `share` and the actions of the app — goes to `onAction`, already checked: a standard
+/// action carries `standard` or `invalid`. `StandardActions.url(for:)` helps a host that wants to open
+/// it, `StandardActions.copyToPasteboard(_:)` and `shareItems(for:)` one that copies or shares.
 ///
 /// `onAction` comes in two forms. A plain closure is called and returns at once. An `async`
 /// closure is awaited by a button that confirms by a swipe: the thumb stays busy until the

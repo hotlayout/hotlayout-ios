@@ -130,13 +130,13 @@ struct RepeaterPlan {
 }
 
 /// The number of cells in a row of a grid. A number is a whole count from 1 to 6 (the schema
-/// allows 2…4 in the document and 1…6 as a per-width override); a value that is not a number
+/// allows 2…6 in the document and 1…6 as a per-width override); a value that is not a number
 /// is 2 (`nonNumericLiteral`, the lower bound of the field).
 func gridColumns(_ raw: JSONValue?, overridden: Bool = true) -> Int? {
     guard let raw, !raw.isNull else { return nil }
     guard let number = raw.numberValue else { return 2 }
-    // The document's own number keeps the bounds of the schema, 2…4; a number from a width layer is 1…6.
-    return SafeInt.clamped(min(overridden ? 6 : 4, max(overridden ? 1 : 2, number.rounded(.down))))
+    // The document's own number keeps the bounds of the schema, 2…6; a number from a width layer is 1…6.
+    return SafeInt.clamped(min(6, max(overridden ? 1 : 2, number.rounded(.down))))
 }
 
 /// The grid arithmetic shared by `Grid` and a `Repeater` with `columns`: the width of a cell

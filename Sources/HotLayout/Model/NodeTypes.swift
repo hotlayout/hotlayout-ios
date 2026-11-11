@@ -31,6 +31,7 @@ enum WidgetType: String, CaseIterable {
     case textField = "TextField"
     case `switch` = "Switch"
     case checkbox = "Checkbox"
+    case chart = "Chart"
 
     init?(_ type: String?) {
         guard let type else { return nil }
@@ -58,6 +59,8 @@ enum ActionType: String {
     case openUrl
     case deeplink
     case close
+    case copy
+    case share
     case setValue
     case toggleValue
 

@@ -17,7 +17,7 @@ public struct DocumentNode: Identifiable, Equatable, Sendable {
     public let fields: JSONObject
     /// The child nodes, in document order.
     public let children: [DocumentNode]
-    /// `columns` of this node came from a width-class layer (read as 1…6, not as the base's 2…4).
+    /// `columns` of this node came from a width-class layer (read as 1…6, not as the base's 2…6).
     let columnsFromOverride: Bool
 
     /// The `style` of the node as the document has it.

@@ -101,7 +101,7 @@ enum WidthRules {
 
     struct EffectiveProps {
         var props: JSONObject
-        /// `columns` came from a layer: its bounds are 1…6, not the base's 2…4.
+        /// `columns` came from a layer: its bounds are 1…6, not the base's 2…6.
         var columnsFromOverride = false
     }
 

@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Problems of an action parameter against its form (`x-actions.problems`), in the order the
 /// checks run: missing, then too long, then the form.
@@ -15,6 +20,10 @@ public enum StandardAction: Equatable, Sendable {
     case openURL(url: String)
     case deeplink(url: String, scheme: String)
     case close
+    /// Put `text` on the clipboard (`copy`).
+    case copy(text: String)
+    /// Open the share sheet with the fields that have a value; at least one does (`share`).
+    case share(text: String?, url: String?)
 }
 
 /// A parameter of a standard action that did not pass its form, and why.
@@ -80,6 +89,8 @@ public enum ActionCatalog {
         let type: ActionType
         let hostExecutes: Bool
         let params: [Param]
+        /// At least one parameter of the list must have a value after data is substituted.
+        var oneOf: [String] = []
     }
 
     static let entries: [Entry] = [
@@ -90,6 +101,14 @@ public enum ActionCatalog {
         Entry(type: .openUrl, hostExecutes: true, params: [Param(name: "url", required: true, form: "httpsUrl", bindable: true)]),
         Entry(type: .deeplink, hostExecutes: true, params: [Param(name: "url", required: true, form: "appLink", bindable: true)]),
         Entry(type: .close, hostExecutes: true, params: []),
+        // The second list of the catalog (`x-copyShare.catalog`).
+        Entry(type: .copy, hostExecutes: true, params: [Param(name: "text", required: true, form: "text", bindable: true)]),
+        Entry(
+            type: .share, hostExecutes: true,
+            params: [
+                Param(name: "text", required: false, form: "text", bindable: true),
+                Param(name: "url", required: false, form: "httpsUrl", bindable: true),
+            ], oneOf: ["text", "url"]),
         Entry(
             type: .setValue, hostExecutes: false,
             params: [
@@ -133,6 +152,9 @@ public enum ActionCatalog {
     /// is an EXPRESSION, not a platform URL parser: the value is neither trimmed nor normalized.
     public static func formProblem(_ form: String, _ value: String?) -> ActionParamProblem? {
         guard let value, !value.isEmpty else { return .missing }
+        // The form `text` is a non-empty string of at most 2048 characters and nothing else: an address, an emoji
+        // and a line break are just text.
+        if form == "text" { return value.utf16.count > urlMaxLength ? .tooLong : nil }
         guard form == "httpsUrl" || form == "appLink" else { return nil }
         if value.utf16.count > urlMaxLength { return .tooLong }
         if form == "httpsUrl" {
@@ -186,7 +208,17 @@ public enum ActionCatalog {
                 return HotlayoutAction(type: type, params: base, invalid: InvalidActionParam(param: param.name, problem: problem))
             }
         }
+        // Then the group: no parameter of it has a value, so the first one is missing.
+        if let first = entry.oneOf.first, !entry.oneOf.contains(where: { !(params[$0] ?? "").isEmpty }) {
+            return HotlayoutAction(type: type, params: base, invalid: InvalidActionParam(param: first, problem: .missing))
+        }
         switch entry.type {
+        case .copy: return HotlayoutAction(type: type, params: base, standard: .copy(text: params["text"] ?? ""))
+        case .share:
+            // Only the fields that have a value.
+            return HotlayoutAction(
+                type: type, params: base,
+                standard: .share(text: params["text"].flatMap { $0.isEmpty ? nil : $0 }, url: params["url"].flatMap { $0.isEmpty ? nil : $0 }))
         case .openUrl: return HotlayoutAction(type: type, params: base, standard: .openURL(url: params["url"] ?? ""))
         case .deeplink:
             let url = params["url"] ?? ""
@@ -237,4 +269,40 @@ public enum StandardActions {
         default: return nil
         }
     }
+
+    /// The text a `copy` action asks to put on the clipboard, or `nil` for any other action and for a `copy` that failed
+    /// its form.
+    public static func copiedText(for action: HotlayoutAction) -> String? {
+        if case .copy(let text)? = action.standard { return text }
+        return nil
+    }
+
+    /// The items a `share` action asks to offer to the share sheet: the text, then the address, only those that have a
+    /// value; `nil` for any other action and for a `share` that failed its form. Hand them to
+    /// `UIActivityViewController(activityItems:applicationActivities:)` or to a `ShareLink`.
+    public static func shareItems(for action: HotlayoutAction) -> [Any]? {
+        guard case .share(let text, let url)? = action.standard else { return nil }
+        var items: [Any] = []
+        if let text { items.append(text) }
+        if let url, let address = URL(string: url) { items.append(address) }
+        return items.isEmpty ? nil : items
+    }
+
+    #if canImport(UIKit)
+    /// Puts the text of a checked `copy` action on the general pasteboard. Returns whether it did; the host decides
+    /// whether to confirm it (iOS shows no confirmation of its own).
+    @MainActor @discardableResult
+    public static func copyToPasteboard(_ action: HotlayoutAction) -> Bool {
+        guard let text = copiedText(for: action) else { return false }
+        UIPasteboard.general.string = text
+        return true
+    }
+    #elseif canImport(AppKit)
+    @MainActor @discardableResult
+    public static func copyToPasteboard(_ action: HotlayoutAction) -> Bool {
+        guard let text = copiedText(for: action) else { return false }
+        NSPasteboard.general.clearContents()
+        return NSPasteboard.general.setString(text, forType: .string)
+    }
+    #endif
 }
