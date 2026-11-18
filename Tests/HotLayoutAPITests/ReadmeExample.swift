@@ -5,7 +5,7 @@
 import HotLayout
 import SwiftUI
 
-struct RewardsScreen: View {
+struct StorefrontScreen: View {
     /// `published.json` of a document and, optionally, `theme/published.json` of its project.
     let documentData: Data
     let themeData: Data?
@@ -21,7 +21,7 @@ struct RewardsScreen: View {
                 HotlayoutScreen(
                     document: document,
                     theme: theme,
-                    data: ["user.name": "Maya", "user.points": 1850],
+                    data: ["user.name": "Maya", "cart.count": 2],
                     locale: Locale.current.identifier,  // the device locale, as is
                     entry: "promo",                     // a named entry point, optional
                     onAction: { action, _ in

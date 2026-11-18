@@ -10,9 +10,9 @@ A Swift package that draws server-driven UI (SDUI) screens published by the [Hot
 [![Docs](https://img.shields.io/badge/docs-hotlayout.com-0a6cc9)](https://hotlayout.com/docs)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/hotlayout/.github/main/profile/assets/app-obsidian.png" alt="A rewards screen built in HotLayout, dark theme" width="240">
+  <img src="https://raw.githubusercontent.com/hotlayout/.github/main/profile/assets/app-obsidian.png" alt="A storefront home screen built in HotLayout, light theme" width="240">
   &nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/hotlayout/.github/main/profile/assets/app-sunny.png" alt="The same kind of screen with another theme, light and playful" width="240">
+  <img src="https://raw.githubusercontent.com/hotlayout/.github/main/profile/assets/app-sunny.png" alt="An onboarding screen built in the same editor, dark theme" width="240">
 </p>
 <p align="center"><sub>Two screens built in HotLayout. Try the editor in your browser, no sign-up: <a href="https://hotlayout.com/try">https://hotlayout.com/try</a></sub></p>
 
@@ -60,7 +60,7 @@ Load the document and the theme once, then draw them with `HotlayoutScreen` insi
 import HotLayout
 import SwiftUI
 
-struct RewardsScreen: View {
+struct StorefrontScreen: View {
     /// `published.json` of a document and, optionally, `theme/published.json` of its project.
     let documentData: Data
     let themeData: Data?
@@ -76,7 +76,7 @@ struct RewardsScreen: View {
                 HotlayoutScreen(
                     document: document,
                     theme: theme,
-                    data: ["user.name": "Maya", "user.points": 1850],
+                    data: ["user.name": "Maya", "cart.count": 2],
                     locale: Locale.current.identifier,  // the device locale, as is
                     entry: "promo",                     // a named entry point, optional
                     onAction: { action, _ in
