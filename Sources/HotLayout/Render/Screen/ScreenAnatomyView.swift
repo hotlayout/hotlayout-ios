@@ -61,6 +61,8 @@ struct ScreenRootView: View {
     @State private var floatTail = 0.0
     @State private var keyboard = 0.0
     @State private var memory = ScrollMemory()
+    /// Open while the screen is built for its show: the nodes that appear play only then.
+    @State private var appearWindow = AppearWindow()
     /// The modal layer around the screen, if any: its sheet drag asks how far the body is scrolled.
     @Environment(\.modalScrollSink) private var modalScrollSink
     @Environment(\.layerAboveKeyboard) private var layerAboveKeyboard
@@ -105,6 +107,9 @@ struct ScreenRootView: View {
         // The shadow of the root lies outside its box, so it is drawn behind the clipped screen (a window shows it).
         .shadowLayers(look.shadow, shape: LogicalCornersShape(corners: look.radius ?? Corners(), rightToLeft: context.rightToLeft))
         .keyboardOverlap($keyboard)
+        .environment(\.appearWindow, appearWindow)
+        // Right after the first build: what is built later (a condition that starts to hold, a new record) stands at once.
+        .onAppear { DispatchQueue.main.async { appearWindow.close() } }
         .onPreferenceChange(ZoneHeightKey.self) { height in if plan.floats, height != floatTail { floatTail = height } }
         .onChange(of: barHeight) { _ in refreshScrolled(plan) }
     }

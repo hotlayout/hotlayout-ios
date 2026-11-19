@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Everything a carousel needs from the document and the theme, already in points.
 struct CarouselSetup {
@@ -20,6 +25,10 @@ struct CarouselSetup {
     var stopPath: String?
     var stopValue: JSONValue?
     var write: ((String, JSONValue) -> Void)?
+    /// The timer that takes the carousel to the next stop (`carousel.autoAdvance`); `nil` is none.
+    var autoAdvance: CarouselAutoAdvance?
+    /// Keyboard focus is on a field inside the carousel: it holds the timer.
+    var keyboardFocus = false
 }
 
 private struct ViewportKey: PreferenceKey {
@@ -37,6 +46,24 @@ private struct CardWidthsKey: PreferenceKey {
     static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
         value.merge(nextValue()) { _, new in new }
     }
+}
+
+/// The notifications that tell whether the app is in front, by platform.
+private enum AppActivity {
+    #if canImport(UIKit)
+    static let resigned = UIApplication.willResignActiveNotification
+    static let became = UIApplication.didBecomeActiveNotification
+    #else
+    static let resigned = NSApplication.willResignActiveNotification
+    static let became = NSApplication.didBecomeActiveNotification
+    #endif
+}
+
+/// What the clock of the timer reads from the view: a plain object, kept up to date by every draw.
+private final class AutoAdvanceLive {
+    var stops: [Double] = [0]
+    var ready = false
+    var offset = 0.0
 }
 
 /// The offset (from the logical start) the scroll is at now; the scroll target behavior has no
@@ -104,10 +131,18 @@ struct CarouselView<Card: View>: View {
     @State private var restored = false
     @State private var current = CurrentOffset()
     @State private var stopController = CarouselStopController()
+    @State private var driver = CarouselAutoAdvanceDriver()
+    @State private var live = AutoAdvanceLive()
     /// True while a finger drags the row; it falls back to false when the gesture is cancelled as well.
     @GestureState private var dragging = false
     @Environment(\.displayScale) private var displayScale
+    /// True while a finger or a pointer button is down on the row, even without moving.
+    @GestureState private var touching = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    /// The app is in front: it leaves that on a call, the lock screen and the app switcher.
+    @State private var appActive = true
+    @Environment(\.screenInFront) private var screenInFront
 
     private static var space: String { "hotlayout.carousel" }
 
@@ -138,7 +173,7 @@ struct CarouselView<Card: View>: View {
 
     var body: some View {
         let plan = stops
-        let _ = configureStop()
+        let _ = configureStop(plan)
         let dots =
             viewport.map {
                 CarouselRules.dotCount(
@@ -152,11 +187,22 @@ struct CarouselView<Card: View>: View {
     }
 
     /// What the controller of the stop reads on every draw (a plain object: no state changes here).
-    private func configureStop() {
+    private func configureStop(_ plan: CarouselRules.Stops) {
         stopController.path = setup.stopPath
         stopController.current = setup.stopValue
         stopController.write = setup.write
         stopController.reducedMotion = reduceMotion
+        configureTimer(plan)
+    }
+
+    /// What the clock of the timer reads and what holds it.
+    private func configureTimer(_ plan: CarouselRules.Stops) {
+        driver.configure(setup.autoAdvance)
+        live.stops = plan.stops
+        live.ready = restored && plan.stops.count > 1
+        driver.set(.keyboardFocus, setup.keyboardFocus)
+        driver.set(.notShown, !screenInFront || !appActive)
+        driver.set(.screenReader, voiceOver)
     }
 
     private func scroller(_ plan: CarouselRules.Stops) -> some View {
@@ -187,6 +233,10 @@ struct CarouselView<Card: View>: View {
                     .onEnded { _ in stopController.personReleased() },
                 including: setup.stopPath == nil ? .subviews : .all
             )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0).updating($touching) { _, state, _ in state = true },
+                including: setup.autoAdvance == nil ? .subviews : .all
+            )
             .carouselSnap(stops: plan.stops, rightToLeft: setup.rightToLeft, scale: Double(displayScale), current: current)
             .coordinateSpace(name: Self.space)
             .background(GeometryReader { geometry in Color.clear.preference(key: ViewportKey.self, value: geometry.size.width) })
@@ -196,6 +246,8 @@ struct CarouselView<Card: View>: View {
                 guard let value else { return }
                 offset = value
                 current.value = Double(value)
+                live.offset = Double(value)
+                if setup.autoAdvance != nil { driver.scrollMoved() }
                 stopController.scrolled(to: Double(value))
                 if restored { remember(CarouselRules.activeStop(plan.stops, offset: Double(value))) }
             }
@@ -209,12 +261,40 @@ struct CarouselView<Card: View>: View {
             .onChange(of: setup.stopValue) { value in stopController.update(value: value) }
             .onAppear {
                 stopController.scrollToStop = { stop, animated in scrollToStop(stop, animated: animated, proxy: proxy) }
+                driver.view = { [live] in
+                    live.ready ? (active: CarouselRules.activeStop(live.stops, offset: live.offset), stopCount: live.stops.count) : nil
+                }
+                driver.onStep = { step in autoStep(step, proxy: proxy) }
                 restore(plan, proxy: proxy)
             }
             .onChange(of: dragging) { held in if !held { stopController.personReleased() } }
-            .onDisappear { stopController.cancel() }
+            .onChange(of: touching) { held in driver.set(.held, held) }
+            .onReceive(NotificationCenter.default.publisher(for: AppActivity.resigned)) { _ in appActive = false }
+            .onReceive(NotificationCenter.default.publisher(for: AppActivity.became)) { _ in appActive = true }
+            .task(id: setup.autoAdvance) { await runClock() }
+            .onDisappear {
+                stopController.cancel()
+                driver.cancel()
+            }
             .opacity(viewport == nil ? 0 : 1)
         }
+    }
+
+    /// The clock of the timer: a tick every 100 ms while the carousel has the field.
+    private func runClock() async {
+        guard setup.autoAdvance != nil else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: UInt64(CarouselAutoAdvance.tickMs * 1_000_000))
+            if Task.isCancelled { return }
+            driver.tick()
+        }
+    }
+
+    /// The timer takes the row to a stop. What the controller holds is as of the last draw; this closure was
+    /// made at the first one.
+    private func autoStep(_ step: Int, proxy: ScrollViewProxy) {
+        driver.scrollMoved()
+        stopController.timerStep(to: step) { stop, animated in scrollToStop(stop, animated: animated, proxy: proxy) }
     }
 
     /// Empty marks at the stops, so that the scroll can be put back on a remembered stop.
@@ -290,6 +370,7 @@ extension CarouselSetup {
         let resolver = context.resolver
         func spacing(_ token: String) -> Double? { resolver.spacing(.string(token)) }
         let stopPath = CarouselStop.path(of: node)
+        let autoAdvance = CarouselAutoAdvance.of(node)
         let key = CarouselMemory.key(
             frame: context.frameIndex, screenId: context.screenId,
             state: CarouselRules.stateKey(nodeId: node.id, instancePath: context.instancePath)
@@ -301,7 +382,8 @@ extension CarouselSetup {
             indicatorGap: spacing(CarouselRules.indicatorGapToken) ?? 8,
             dotColor: (context.theme.coreColor(CarouselRules.dotColorToken)).color,
             memory: context.carousels, memoryKey: key,
-            stopPath: stopPath, stopValue: stopPath.flatMap { context.scope[$0] }, write: context.write
+            stopPath: stopPath, stopValue: stopPath.flatMap { context.scope[$0] }, write: context.write,
+            autoAdvance: autoAdvance, keyboardFocus: autoAdvance != nil && CarouselAutoAdvance.holdsFocus(node, focus: context.form?.focus?.wrappedValue)
         )
     }
 }

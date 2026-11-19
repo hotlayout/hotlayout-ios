@@ -49,9 +49,14 @@ struct StackView: View {
             // handed over is the one of left-to-right text (`LayerGeometry.drawnAngle` is the
             // angle as the contract states it for the mirrored layout).
             // The shift of a moving layer goes along the screen axes, after the turn of the layer.
+            // The turn of a motion (`spin`, `sway`) lies inside the turn of the layer: about the box as
+            // the layer placed it.
+            let motion = NodeMotion.read(child.fields["motion"])
             NodeView(node: child, context: context, placement: .natural, depth: depth + 1, parentType: node.type, motionOutside: true)
+                .nodeMotion(motion, rightToLeft: context.rightToLeft, part: .turnsOnly)
                 .rotationEffect(.degrees(Double(read.rotate)))
-                .nodeMotion(NodeMotion.read(child.fields["motion"]), rightToLeft: context.rightToLeft)
+                .nodeMotion(motion, rightToLeft: context.rightToLeft, part: .shiftsOnly)
+                .nodeAppear(NodeAppear.reads(child, isScreenZone: false) ? NodeAppear.read(child.fields[NodeAppear.field]) : nil, id: child.id)
                 .layoutValue(key: LayerRoleKey.self, value: .overlay(place))
         }
     }

@@ -45,6 +45,20 @@ row is checked only for non-empty text.
 - **Right to left**: SwiftUI mirrors a custom `Layout` and an `offset` in right-to-left text on iOS
   and macOS, but mirrors a `Shape` on macOS only. Layers and motion are placed in logical
   coordinates; the dashed border fixes its own direction.
+- **Turns in right-to-left text**: SwiftUI mirrors `rotationEffect` there as well. A `sway` is mirrored by
+  the contract, so it is handed over as in left-to-right text; a `spin` has no direction of the line, so
+  the reader gives it its sign back.
+- **Moving nodes and touches**: a node that moves, turns or appears is moved by `offset` and `rotationEffect`,
+  which move its touch area with it; the contract promises the area at rest.
+- **Transitions between screens** are run by the reader, not by SwiftUI: SwiftUI only animates a clock (the
+  milliseconds since the step began, linearly) and the reader draws every frame from the contract's curve.
+  The screen that goes stays a live view beside the screen that comes (so it keeps its scroll) and is
+  hidden from touch and VoiceOver. There is no swipe back from the edge: the reader keeps no
+  `UINavigationController`.
+- **The carousel that advances by time** is paused while a finger is down on it, while a field inside it
+  has the keyboard, while its scroll moves, while its screen is not in front or the app is not active
+  (`willResignActive` / `didBecomeActive`), and while VoiceOver is on. A hardware-keyboard focus on a
+  button inside the carousel is not seen: SwiftUI does not report the focus of a view below.
 - **Carousel snapping** to the stops needs iOS 17 (`ScrollTargetBehavior`); on iOS 16 the scroll is
   free and the dots still follow it.
 - **Glass** (`style.backdropBlur`) blurs what lies under the box with the system blur view, clipped

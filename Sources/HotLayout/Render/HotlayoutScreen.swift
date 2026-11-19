@@ -63,18 +63,28 @@ public struct HotlayoutScreen: View {
     let onReport: (([HotlayoutReport]) -> Void)?
     let onScreenCovered: ((Bool) -> Void)?
 
-    @State private var flow: Flow?
+    @State var flow: Flow?
     @State private var session: DataScope = [:]
-    @State private var carousels = CarouselMemory()
+    @State var carousels = CarouselMemory()
     /// Lives as long as the screen does, not as long as one value of this view: a parent that
     /// draws again makes a new `HotlayoutScreen`, and the reports must not start over.
-    @State private var sink = ReportSink()
+    @State var sink = ReportSink()
     /// Fires on the main queue, after the frame, when there may be reports to hand over.
     @State private var reportsAdded = PassthroughSubject<Void, Never>()
     /// The screen-shown events after the first one, handed to the newest `onScreenChange`.
-    @State private var screensShown = PassthroughSubject<ScreenShownEvent, Never>()
+    @State var screensShown = PassthroughSubject<ScreenShownEvent, Never>()
     /// The fills of the swipe buttons that ask for `confirmTransition: 'ripple'`.
-    @State private var ripples = SwipeRippleStore(mount: SwipeRippleWindow.mount)
+    @State var ripples = SwipeRippleStore(mount: SwipeRippleWindow.mount)
+    /// The step of the stack that is being played, and how far it has gone (milliseconds).
+    @State var running: RunningTransition?
+    @State var elapsedMs = 0.0
+    /// Names the stack that is drawn; it changes with a step that plays a page motion, so that the stack
+    /// that goes is the very view it was while the new one is built beside it.
+    @State var generation = 0
+    /// The width of the area the host gave the stack, as of the last draw: the plan of a step needs it.
+    @State var area = AreaWidth()
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.stackTransitionFreezeMs) var freezeMs
 
     /// - Parameters:
     ///   - document: a document from `HotlayoutDocument.load(_:)`.
@@ -187,12 +197,12 @@ public struct HotlayoutScreen: View {
         self.onAction = .awaited(onAction)
     }
 
-    private var currentFlow: Flow {
+    var currentFlow: Flow {
         flow ?? Flow(document: FlowDocument(document), entry: entry)
     }
 
     /// The data of the host under the session the person wrote into.
-    private var hostScope: DataScope {
+    var hostScope: DataScope {
         RecordScope.merge(DataLayers(session: session, data: data))
     }
 
@@ -200,56 +210,38 @@ public struct HotlayoutScreen: View {
         let flow = currentFlow
         let resolution = Localization.resolve(document.localization, requested: locale)
         let rightToLeft = TextDirectionRule.isRightToLeft(resolution.directionLocale) ?? false
-        let frames = flow.stack
-        let pageIndex =
-            frames.lastIndex { frame in
-                frame == frames.first || document.screen(frame.screenId)?.presentation != .modal
-            } ?? 0
-        let pageScreen = frames.indices.contains(pageIndex) ? document.screen(frames[pageIndex].screenId) : nil
 
         // The insets are read from the reader, which respects the safe area; the stack reaches over
         // the top and bottom ones itself (a view that ignores the safe area is told they are zero).
-        GeometryReader { area in
-            let insets = ScreenInsets(top: Double(area.safeAreaInsets.top), bottom: Double(area.safeAreaInsets.bottom))
+        GeometryReader { geometry in
+            let insets = ScreenInsets(top: Double(geometry.safeAreaInsets.top), bottom: Double(geometry.safeAreaInsets.bottom))
             // One class for the whole screen, from the box the host gave it: a page takes the class of
             // that box, a modal layer is always compact (its own box is narrower than 600).
-            let areaWidth = Double(area.size.width)
+            let areaWidth = Double(geometry.size.width)
+            let _ = area.width = areaWidth
             let place = ScreenPlace(resolution: resolution, rightToLeft: rightToLeft, areaClass: WidthClass.of(width: areaWidth))
-            let layerScreens = Dictionary(
-                uniqueKeysWithValues: frames.indices.filter { $0 > pageIndex }.compactMap { index in document.screen(frames[index].screenId).map { (index, $0) } })
-            ModalStack(
-                layers: layerScreens.keys.sorted().compactMap { index in
-                    layerScreens[index].map { screen in
-                        let placement = screen.placement.map { JSONValue.string($0.rawValue) }
-                        return ModalStackLayer(
-                            id: index, shape: WideChrome.modalShape(placement: placement, areaWidth: areaWidth), placement: placement,
-                            blur: screen.backdropBlur, dismissible: screen.dismissible)
-                    }
-                },
-                margin: StyleResolver(theme: themeSet.theme(themeId)).spacing(.string("xl")) ?? ModalRules.defaultMargin,
-                insets: insets,
-                dismiss: dismissLayer,
-                page: {
-                    if let pageScreen {
-                        screenView(pageScreen, frame: frames[pageIndex], index: pageIndex, place: place, insets: insets, asLayer: false)
-                            // Keyed by the place in the stack and the screen, as in the other readers: the page that
-                            // replaces another is a new view, so it starts at its top instead of inheriting the
-                            // scroll of the screen it replaced (SwiftUI would reuse the same scroll view).
-                            .id("\(pageIndex)/\(pageScreen.screenId)")
-                    } else {
-                        Color.clear
-                    }
-                },
-                layer: { layer in
-                    if let screen = layerScreens[layer.id] {
-                        // A layer holds no top inset; a sheet holds the bottom one under its content, a window none.
-                        screenView(
-                            screen, frame: frames[layer.id], index: layer.id, place: place,
-                            insets: ScreenInsets(top: 0, bottom: layer.shape == .sheet ? insets.bottom : 0), asLayer: true,
-                            sheetWindow: layer.shape == .sheetWindow)
-                    }
+            let space = StackSpace(width: areaWidth, insets: insets, place: place)
+            let motion = running.map { StackMotion(plan: $0.plan, elapsedMs: elapsedMs, rightToLeft: rightToLeft) }
+            // The stack that goes stays as the very view it was, beside the one that comes: the slots are
+            // told apart by the generation of the stack.
+            let slots = stackSlots(flow)
+            ZStack {
+                ForEach(slots) { slot in
+                    let paged = motion.map { $0.plan.motion.isPage } == true
+                    stack(
+                        slot.frames, space: space, motion: slot.isGhost ? nil : motion,
+                        ghostLayer: slot.isGhost ? nil : running.flatMap { ghostLayer(of: $0, space: space) }, gone: slot.isGhost
+                    )
+                    .modifier(
+                        PageFrame(
+                            motion: LayerMotion(motion: paged ? motion ?? LayerMotion.rest.motion : LayerMotion.rest.motion, incoming: !slot.isGhost),
+                            areaWidth: areaWidth)
+                    )
+                    .allowsHitTesting(!slot.isGhost)
+                    // A page that comes lies over the one under it; the one that goes lies over it on a back step and a dissolve.
+                    .zIndex(slot.isGhost && running?.plan.motion != .push ? 2 : slot.isGhost ? 0 : 1)
                 }
-            )
+            }
             .ignoresSafeArea(.all, edges: .vertical)
         }
         // The screen keeps its size when the keyboard comes: the zones account for it themselves
@@ -281,7 +273,10 @@ public struct HotlayoutScreen: View {
         .onReceive(screensShown) { onScreenChange?($0) }
         .onChange(of: DrawnDocument(document: document)) { new in
             var updated = currentFlow
-            if let event = updated.update(document: FlowDocument(new.document)) { screensShown.send(event) }
+            if let event = updated.update(document: FlowDocument(new.document)) {
+                screensShown.send(event)
+                running = nil
+            }
             self.flow = updated
             record(new.document.reports)
             deliverReports()
@@ -296,7 +291,10 @@ public struct HotlayoutScreen: View {
         }
         .onChange(of: entry) { newEntry in
             var updated = currentFlow
-            if let event = updated.restart(entry: newEntry) { screensShown.send(event) }
+            if let event = updated.restart(entry: newEntry) {
+                screensShown.send(event)
+                running = nil
+            }
             self.flow = updated
             deliverReports()
         }
@@ -311,13 +309,13 @@ public struct HotlayoutScreen: View {
     }
 
     /// What every screen of the stack shares: the language and the class of the area.
-    private struct ScreenPlace {
+    struct ScreenPlace {
         let resolution: LocaleResolution
         let rightToLeft: Bool
         let areaClass: WidthClass
     }
 
-    private func screenView(
+    func screenView(
         _ screen: ScreenEntry, frame: FlowFrame, index: Int, place: ScreenPlace, insets: ScreenInsets, asLayer: Bool, sheetWindow: Bool = false
     ) -> some View {
         let widthClass = WideChrome.contentWidthClass(presentation: screen.presentation, area: place.areaClass)
@@ -414,7 +412,7 @@ public struct HotlayoutScreen: View {
 
     /// Closes the modal layer on top without a press: a tap on the scrim or a drag that closes a
     /// sheet. The host is asked first, as for `navigate.back`; the source names no node of the document.
-    private func dismissLayer(animated: Bool) {
+    func dismissLayer(animated: Bool) {
         var updated = currentFlow
         let screenId = updated.top?.screenId ?? ""
         let source = ActionSource(nodeId: ActionSource.layerDismissal, screenId: screenId, record: updated.nodeRecord(instances: []))
@@ -422,21 +420,9 @@ public struct HotlayoutScreen: View {
             onNavigate?(NavigationEvent(kind: kind, from: from, to: to, action: action, source: source)) ?? true
         }
         guard let shown else { return }
-        show(updated, animated: animated)
+        show(updated, step: .pop, dragged: !animated)
         screensShown.send(shown)
         deliverReports()
-    }
-
-    /// Puts a new stack on the screen, with the motion of a screen change unless `animated` is false.
-    private func show(_ updated: Flow, animated: Bool) {
-        carousels.prune(frames: updated.stack.map(\.screenId))
-        if animated {
-            withAnimation(.easeOut(duration: 0.22)) { self.flow = updated }
-        } else {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) { self.flow = updated }
-        }
     }
 
     private func perform(_ action: JSONObject, node: DocumentNode, instances: [ListInstance] = []) -> PressRun {
@@ -457,7 +443,7 @@ public struct HotlayoutScreen: View {
         )
         let task = PressDelivery.hand(outcome, source: source, onAction: { handOver($0, $1) })
         // A fill that covers the screen is the motion: the screen changes under it with no motion of its own.
-        if updated != before { show(updated, animated: !ripples.covers) }
+        if updated != before { show(updated, step: StackStep(outcome.shown?.cause)) }
         if let shown = outcome.shown { screensShown.send(shown) }
         deliverReports()
         return PressRun(runner: SwipeConfirmRules.runner(type: action["type"]?.stringValue, outcome: outcome), task: task)

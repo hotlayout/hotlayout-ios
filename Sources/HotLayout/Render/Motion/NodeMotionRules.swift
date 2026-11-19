@@ -1,13 +1,19 @@
 import Foundation
 
-/// The endless motion of a node (`x-motion`): `float` drifts, `pulse` breathes. A motion is a
-/// paint transform over the box the node has at rest; it changes no layout.
+/// The endless motion of a node (`x-motion`, `x-motionTurn`): `float` drifts, `pulse` breathes,
+/// `spin` turns at a constant speed, `sway` swings about a point of its box. A motion is a paint
+/// transform over the box the node has at rest; it changes no layout.
 struct NodeMotion: Equatable {
     enum Axis: String { case vertical, horizontal, both }
+
+    /// The point of the box a swaying node turns about.
+    enum Pivot: String { case center, top, bottom }
 
     enum Kind: Equatable {
         case float(axis: Axis, amplitude: Int)
         case pulse(scale: Double, opacity: Double?)
+        case spin(clockwise: Bool)
+        case sway(angle: Int, pivot: Pivot)
     }
 
     let kind: Kind
@@ -19,18 +25,37 @@ struct NodeMotion: Equatable {
     static let durationRange = 400...60000
     static let delayRange = 1...60000
     static let amplitudeRange = 1...48
+    static let angleRange = 1...45
     static let scaleRange = 0.5...1.5
     static let opacityRange = 0.0...1.0
 
-    /// A pose: a shift (x toward the end of the line is positive, y down), a scale and an opacity.
+    /// A pose: a shift (x toward the end of the line is positive, y down), a scale, an opacity and a
+    /// turn in degrees, clockwise, about `pivot`.
     struct Pose: Equatable {
         var x = 0.0
         var y = 0.0
         var scale = 1.0
         var opacity = 1.0
+        var rotate = 0.0
+        var pivot = Pivot.center
 
         static let rest = Pose()
-        var isRest: Bool { self == .rest }
+        var isRest: Bool { x == 0 && y == 0 && scale == 1 && opacity == 1 && rotate == 0 }
+    }
+
+    /// The turn mirrors in right-to-left writing (`sway`); a `spin` has no direction of the line.
+    var turnsWithTheLine: Bool {
+        if case .sway = kind { return true }
+        return false
+    }
+
+    /// The kinds that turn the node (they lie inside the turn of a layer, about the box as the layer
+    /// placed it); the others shift, scale and fade along the screen axes.
+    var turns: Bool {
+        switch kind {
+        case .spin, .sway: return true
+        case .float, .pulse: return false
+        }
     }
 
     /// The motion of a value, or `nil` when it is not a motion this reader can draw: a form it
@@ -59,6 +84,14 @@ struct NodeMotion: Equatable {
                 opacity = read
             }
             return NodeMotion(kind: .pulse(scale: scale, opacity: opacity), duration: duration, delay: delay)
+        case "spin":
+            guard only(["direction"]), let direction = object["direction"]?.stringValue, direction == "clockwise" || direction == "counterclockwise" else { return nil }
+            return NodeMotion(kind: .spin(clockwise: direction == "clockwise"), duration: duration, delay: delay)
+        case "sway":
+            guard only(["angle", "pivot"]), let pivot = object["pivot"]?.stringValue.flatMap(Pivot.init(rawValue:)),
+                let angle = ContractShapes.wholeNumber(object["angle"], below: 1e9), angleRange.contains(angle)
+            else { return nil }
+            return NodeMotion(kind: .sway(angle: angle, pivot: pivot), duration: duration, delay: delay)
         default:
             return nil
         }
@@ -94,6 +127,11 @@ struct NodeMotion: Equatable {
         case .pulse(let scale, let opacity):
             let progress = (1 - cos(theta)) / 2
             return Pose(scale: 1 + (scale - 1) * progress, opacity: 1 + ((opacity ?? 1) - 1) * progress)
+        case .spin(let clockwise):
+            // A constant speed: no curve, an even turn is the point of spinning. Not mirrored.
+            return Pose(rotate: (clockwise ? 1 : -1) * 360 * phase / cycle + 0)
+        case .sway(let angle, let pivot):
+            return Pose(rotate: (rightToLeft ? -1 : 1) * Double(angle) * sin(theta) + 0, pivot: pivot)
         }
     }
 }

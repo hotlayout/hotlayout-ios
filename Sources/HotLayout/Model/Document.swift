@@ -84,6 +84,8 @@ public struct ScreenEntry: Equatable, Sendable {
     public let backdropBlur: Int?
     /// `false` only for a modal layer that waits for an action inside it.
     public let dismissible: Bool
+    /// How the screen asks to come and go (`transition`): `fade` or `none`; `nil` for the default motion.
+    var transition: ScreenTransitionWord? = nil
     /// The root node of the screen.
     public let root: DocumentNode
 }
@@ -232,6 +234,7 @@ enum DocumentReader {
                     statusBar: ScreenAnatomy.statusBarIcons(entry["statusBarIcons"]).flatMap(StatusBarIcons.init(rawValue:)),
                     backdropBlur: isModal ? ModalRules.blurRadius(entry["backdropBlur"]) : nil,
                     dismissible: !(isModal && entry["dismissible"]?.boolValue == false),
+                    transition: ScreenTransitionWord.of(entry[ScreenTransition.field]),
                     root: root
                 )
             )

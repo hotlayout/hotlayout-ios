@@ -120,6 +120,18 @@ final class CarouselStopController {
         }
     }
 
+    /// The timer of `autoAdvance` took the row to a stop. It is the reader's own move: animated unless the
+    /// system asks for no motion, and the settle of it writes nothing. With a path the number of the new stop
+    /// is then written, once, and the value finds the row already heading there. A row with no path is moved
+    /// by `scroll`, which the view gives (the controller knows no stops then).
+    func timerStep(to index: Int, scroll: (_ stop: Int, _ animated: Bool) -> Void) {
+        let animated = !reducedMotion
+        guard let path else { return scroll(index, animated) }
+        move(to: index, animated: animated)
+        guard let write, let value = CarouselAutoAdvance.write(step: index, current: current) else { return }
+        write(path, .number(Double(value)))
+    }
+
     /// A move by the reader: it never writes.
     private func move(to index: Int, animated: Bool) {
         guard index >= 0, index < stops.count else { return }

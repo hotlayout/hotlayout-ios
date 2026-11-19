@@ -59,6 +59,13 @@ struct ModalLayerView<Content: View>: View {
     let isTop: Bool
     /// Blur of the layer's own picture: the layers above it blur it.
     let blurredBy: Double
+    /// The same without the layer that comes or goes with the motion of the step, and the motion.
+    var blurredByWithout: Double?
+    var stepMotion: StackMotion?
+    /// This layer comes or goes with the motion of the step.
+    var layerMotion: LayerMotion?
+    /// The layer has already left the stack and is drawn only while it goes: it takes no touch and no focus.
+    var ghost = false
     /// What the host's window leaves of the area: the layer lies in the area below the top inset, a window also above the bottom one.
     let insets: ScreenInsets
     let dismiss: (_ animated: Bool) -> Void
@@ -66,7 +73,8 @@ struct ModalLayerView<Content: View>: View {
     /// `exiting` starts a layer that is already sliding out (`ModalStack` never does; a test does).
     init(
         content: Content, shape: WideChrome.ModalShape, placement: JSONValue?, margin: Double, dismissible: Bool, isTop: Bool, blurredBy: Double,
-        insets: ScreenInsets = ScreenInsets(), exiting: Bool = false, dismiss: @escaping (_ animated: Bool) -> Void
+        insets: ScreenInsets = ScreenInsets(), exiting: Bool = false, blurredByWithout: Double? = nil, stepMotion: StackMotion? = nil,
+        layerMotion: LayerMotion? = nil, ghost: Bool = false, dismiss: @escaping (_ animated: Bool) -> Void
     ) {
         self.content = content
         self.shape = shape
@@ -76,6 +84,10 @@ struct ModalLayerView<Content: View>: View {
         self.isTop = isTop
         self.blurredBy = blurredBy
         self.insets = insets
+        self.blurredByWithout = blurredByWithout
+        self.stepMotion = stepMotion
+        self.layerMotion = layerMotion
+        self.ghost = ghost
         self.dismiss = dismiss
         _exiting = State(initialValue: exiting)
     }
@@ -103,12 +115,15 @@ struct ModalLayerView<Content: View>: View {
         ZStack {
             Color.black
                 .opacity(ModalRules.scrimOpacity * visibleShare)
+                .modifier(ScrimOpacity(motion: layerMotion?.motion ?? LayerMotion.rest.motion, resting: 1))
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { if dismissible { dismiss(true) } }
-                .transition(.opacity)
             ModalBoxLayout(placement: placement, margin: margin) {
                 content
+                    // The motion of the step: the sheet's own height, the window's own centre.
+                    .modifier(FrameGeometry(motion: layerMotion ?? LayerMotion.rest, areaWidth: 0))
+                    .modifier(FrameOpacity(motion: layerMotion ?? LayerMotion.rest))
                     .environment(\.modalScrollSink, sink)
                     .background(
                         GeometryReader { proxy in
@@ -119,19 +134,20 @@ struct ModalLayerView<Content: View>: View {
             .padding(.top, CGFloat(insets.top))
             .padding(.bottom, keyboard > 0 ? CGFloat(keyboard) : window ? CGFloat(insets.bottom) : 0)
             .environment(\.layerAboveKeyboard, keyboard > 0)
-            .blur(radius: blurredBy)
+            .modifier(StackBlur(without: blurredByWithout ?? blurredBy, with: blurredBy, motion: stepMotion))
             .offset(y: offset)
-            .modifier(SheetDrag(enabled: !window && dismissible && isTop && !exiting, gesture: dragGesture))
-            .transition(layerTransition)
+            .modifier(SheetDrag(enabled: !window && dismissible && isTop && !exiting && !ghost, gesture: dragGesture))
         }
         // Measured on the area of the layer, which the lift does not move.
         .keyboardOverlap($keyboard)
-        .allowsHitTesting(isTop && !exiting)
-        .accessibilityHidden(!isTop)
-        .accessibilityAddTraits(isTop ? .isModal : [])
+        .allowsHitTesting(isTop && !exiting && !ghost)
+        .accessibilityAddTraits(isTop && !ghost ? .isModal : [])
         .accessibilityAction(.escape) {
             if ModalRules.escapeSteps(key: "Escape", repeating: false, modalOnTop: isTop, topDismissible: dismissible) > 0 { dismiss(true) }
         }
+        .environment(\.screenInFront, isTop && !ghost)
+        // Last: what is added to the layer after it would show it to a screen reader again.
+        .accessibilityHidden(!isTop || ghost)
         // The layer goes once it has slid out; a layer that is gone first closes nothing.
         .task(id: exiting) { await leaveAfterExit() }
     }
@@ -143,11 +159,6 @@ struct ModalLayerView<Content: View>: View {
         try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         guard !Task.isCancelled else { return }
         dismiss(false)
-    }
-
-    private var layerTransition: AnyTransition {
-        if reduceMotion { return .opacity }
-        return window ? .scale(scale: ModalRules.windowStartScale).combined(with: .opacity) : .move(edge: .bottom)
     }
 
     private func animation(_ motion: ModalRules.Motion) -> Animation? {
@@ -212,40 +223,67 @@ struct ModalStackLayer: Identifiable {
     let placement: JSONValue?
     let blur: Int?
     let dismissible: Bool
+    /// The layer has already left the stack and is drawn only while it goes (the stack lists it last).
+    var ghost = false
 }
 
 /// The page and the modal layers over it. Every layer is its own stacking context and the page
 /// and the layers below it are inert: the touch and the screen reader reach only the top layer.
 /// Under a layer the picture is blurred by the layer's `backdropBlur`, the scrim lies over the blur.
+///
+/// While a step of the stack moves a layer (`motion`), the layer that comes is the top one, and the
+/// one that goes is listed last as a `ghost`: it keeps its place in the list so that it goes as the view it was.
 struct ModalStack<Page: View, Layer: View>: View {
     let layers: [ModalStackLayer]
     let margin: Double
     var insets = ScreenInsets()
+    var motion: StackMotion?
+    /// The whole stack has gone (it is drawn only while a page motion plays): it takes no touch and is
+    /// hidden from assistive technology. Said by each part and not by the stack as a whole: an explicit
+    /// "not hidden" on the stack would stand over what a layer inside it hides.
+    var gone = false
     /// `animated` is false after the sheet has already left by a drag.
     let dismiss: (_ animated: Bool) -> Void
     @ViewBuilder let page: () -> Page
     @ViewBuilder let layer: (ModalStackLayer) -> Layer
 
-    private func blur(above index: Int) -> Double {
-        ModalRules.combinedBlur(layers.dropFirst(index + 1).compactMap(\.blur))
+    private var real: [ModalStackLayer] { layers.filter { !$0.ghost } }
+
+    /// The layer that comes or goes with the motion of the step.
+    private var movingId: Int? {
+        guard let plan = motion?.plan, plan.motion.isLayer else { return nil }
+        return plan.motion.isLayerIn ? real.last?.id : layers.first { $0.ghost }?.id
+    }
+
+    private func blur(of entries: some Sequence<ModalStackLayer>) -> Double {
+        ModalRules.combinedBlur(entries.compactMap(\.blur))
     }
 
     var body: some View {
+        let moving = movingId
+        let stayed = layers.filter { $0.id != moving }
+        let realCount = real.count
         ZStack {
             page()
-                .blur(radius: ModalRules.combinedBlur(layers.compactMap(\.blur)), opaque: true)
-                .allowsHitTesting(layers.isEmpty)
-                .accessibilityHidden(!layers.isEmpty)
+                .modifier(StackBlur(without: blur(of: stayed), with: blur(of: layers), motion: moving == nil ? nil : motion, opaque: true))
+                .allowsHitTesting(realCount == 0 && !gone)
+                .accessibilityHidden(realCount > 0 || gone)
+                .environment(\.screenInFront, realCount == 0 && !gone)
             ForEach(Array(layers.enumerated()), id: \.element.id) { index, entry in
+                let above = layers.dropFirst(index + 1)
                 ModalLayerView(
                     content: layer(entry),
                     shape: entry.shape,
                     placement: entry.placement,
                     margin: margin,
                     dismissible: entry.dismissible,
-                    isTop: index == layers.count - 1,
-                    blurredBy: blur(above: index),
+                    isTop: !gone && !entry.ghost && index == realCount - 1,
+                    blurredBy: blur(of: above),
                     insets: insets,
+                    blurredByWithout: blur(of: above.filter { $0.id != moving }),
+                    stepMotion: moving == nil ? nil : motion,
+                    layerMotion: entry.id == moving ? motion.map { LayerMotion(motion: $0, incoming: $0.plan.motion.isLayerIn) } : nil,
+                    ghost: entry.ghost,
                     dismiss: dismiss
                 )
                 .zIndex(Double(index + 1))

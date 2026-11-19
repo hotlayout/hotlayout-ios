@@ -13,9 +13,34 @@ extension EnvironmentValues {
     }
 }
 
+/// Which kinds of a motion a modifier paints. A layer of a `Stack` paints the turning kinds inside
+/// its own turn and the others outside it.
+enum MotionPart {
+    case all, turnsOnly, shiftsOnly
+
+    func paints(_ motion: NodeMotion) -> Bool {
+        switch self {
+        case .all: return true
+        case .turnsOnly: return motion.turns
+        case .shiftsOnly: return !motion.turns
+        }
+    }
+}
+
+extension NodeMotion.Pivot {
+    var unitPoint: UnitPoint {
+        switch self {
+        case .center: return .center
+        case .top: return .top
+        case .bottom: return .bottom
+        }
+    }
+}
+
 /// Paints the motion of a node over the box it has at rest: a shift along the screen axes, a
-/// scale about the centre of the box and an opacity that multiplies the node's own. Nothing
-/// here touches layout, so the neighbours stay where they are. "Reduce motion" is rest.
+/// scale about the centre of the box, a turn about the centre or the middle of an edge and an
+/// opacity that multiplies the node's own. Nothing here touches layout, so the neighbours stay
+/// where they are. "Reduce motion" is rest.
 struct NodeMotionModifier: ViewModifier {
     let motion: NodeMotion
     let rightToLeft: Bool
@@ -45,8 +70,12 @@ struct NodeMotionModifier: ViewModifier {
         // SwiftUI mirrors an offset in a right-to-left environment by itself: toward the end of the
         // line is then already the left. Mirror here only when the environment is not mirrored.
         let pose = motion.pose(at: elapsedMs, rightToLeft: rightToLeft && layoutDirection == .leftToRight)
+        // SwiftUI mirrors a turn in a right-to-left environment as well: a sway has the mirrored sign
+        // already, a spin has no direction of the line and gets the sign back.
+        let turn = layoutDirection == .rightToLeft && !motion.turnsWithTheLine ? -pose.rotate : pose.rotate
         return
             content
+            .rotationEffect(.degrees(turn), anchor: pose.pivot.unitPoint)
             .scaleEffect(pose.scale)
             .offset(x: pose.x, y: pose.y)
             .opacity(pose.opacity)
@@ -56,8 +85,8 @@ struct NodeMotionModifier: ViewModifier {
 extension View {
     /// The node's motion when it has a readable one.
     @ViewBuilder
-    func nodeMotion(_ motion: NodeMotion?, rightToLeft: Bool, fixedElapsedMs: Double? = nil) -> some View {
-        if let motion {
+    func nodeMotion(_ motion: NodeMotion?, rightToLeft: Bool, part: MotionPart = .all, fixedElapsedMs: Double? = nil) -> some View {
+        if let motion, part.paints(motion) {
             modifier(NodeMotionModifier(motion: motion, rightToLeft: rightToLeft, fixedElapsedMs: fixedElapsedMs))
         } else {
             self

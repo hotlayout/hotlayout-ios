@@ -49,6 +49,8 @@ struct NodeView: View {
         // The press target is the box of the node without its margin; the motion moves that box.
         pressable(box, inner)
             .nodeMotion(motionOutside || node.widget == .screen ? nil : NodeMotion.read(node.fields["motion"]), rightToLeft: context.rightToLeft)
+            // The appearance lies over the pose of the motion: its shift adds, its opacity multiplies.
+            .nodeAppear(motionOutside || !NodeAppear.reads(node, isScreenZone: isScreenZone) ? nil : NodeAppear.read(node.fields[NodeAppear.field]), id: node.id)
             .padding(shaped.margin.edgeInsets)
     }
 
